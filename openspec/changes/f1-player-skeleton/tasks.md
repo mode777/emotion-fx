@@ -53,3 +53,9 @@ js-runtime, verification).
 
 - [x] 8.1 Author `.github/workflows/ci.yml`: native matrix (ubuntu/windows/macos) + Emscripten job, each configure → build → ctest; verify the workflow file is valid YAML and triggers on push to main
 - [x] 8.2 Push and confirm a fully green run: all four jobs build and pass the smoke suite; verify via the Actions run summary (https://github.com/mode777/emotion-fx/actions/runs/35457715867)
+
+## 9. Browser verification deployment (added during apply)
+
+- [x] 9.1 Add a browser-compatible `player_web` Emscripten target (no Node raw FS, preloaded `examples/browser` resource root, canvas shell output) without changing the Node-based test build; verify the pages CI job builds it and emits html/js/wasm/data
+- [x] 9.2 Deploy the web player to GitHub Pages on every push to main (repo made public, Pages build_type=workflow); verify the deployed page serves index.html, player_web.js, player_web.wasm, and player_web.data with HTTP 200 (https://mode777.github.io/emotion-fx/)
+- [ ] 9.3 User visually verifies the deployed page: canvas shows the dark blue-grey clear color and the browser console shows `browser hello` frame logs advancing; record the result
