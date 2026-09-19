@@ -53,6 +53,15 @@ target_link_libraries(player PRIVATE efx_core efx_platform)
 if(EMSCRIPTEN)
     set_target_properties(player PROPERTIES SUFFIX ".js")
     target_link_options(player PRIVATE -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2 -sNODERAWFS=1)
+
+    add_executable(player_web src/main.c src/player/player.c)
+    target_link_libraries(player_web PRIVATE efx_core efx_platform)
+    set_target_properties(player_web PROPERTIES SUFFIX ".html")
+    target_link_options(player_web PRIVATE
+        -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2
+        -sENVIRONMENT=web
+        "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/examples/browser@/examples/browser"
+        "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web_pre.js")
 elseif(APPLE)
     enable_language(OBJC)
     set_source_files_properties(src/platform/platform.c PROPERTIES LANGUAGE OBJC)

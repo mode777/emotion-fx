@@ -50,3 +50,41 @@ jobs:
 
       - name: Smoke tests (headless under Node)
         run: ctest --test-dir build-em --output-on-failure
+
+  pages:
+    name: deploy web player (github pages)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Build web player
+        run: |
+          emcmake cmake -B build-web -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-web --target player_web
+
+      - name: Collect pages content
+        run: |
+          mkdir pages
+          cp build-web/player_web.html pages/index.html
+          cp build-web/player_web.js build-web/player_web.wasm build-web/player_web.data pages/
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
