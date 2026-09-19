@@ -49,10 +49,11 @@ target_link_libraries(player PRIVATE efx_core efx_platform)
 
 if(EMSCRIPTEN)
     set_target_properties(player PROPERTIES SUFFIX ".js")
-    target_link_options(player PRIVATE -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1)
+    target_link_options(player PRIVATE -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2)
 elseif(APPLE)
     enable_language(OBJC)
     set_source_files_properties(src/platform/platform.c PROPERTIES LANGUAGE OBJC)
+    target_compile_options(efx_platform PRIVATE -include sys/types.h)
     target_link_libraries(efx_platform PRIVATE
         "-framework Cocoa" "-framework QuartzCore"
         "-framework Metal" "-framework MetalKit")
