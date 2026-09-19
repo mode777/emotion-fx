@@ -20,6 +20,15 @@ struct efx_runtime {
     int has_render;
 };
 
+static char *dup_string(const char *s) {
+    size_t n = strlen(s) + 1;
+    char *p = malloc(n);
+    if (p) {
+        memcpy(p, s, n);
+    }
+    return p;
+}
+
 static char *read_file(const char *path, size_t *out_len) {
     FILE *f = fopen(path, "rb");
     if (!f) {
@@ -101,7 +110,7 @@ efx_runtime *efx_runtime_new(char *const *args, int arg_count) {
     if (arg_count > 0 && args) {
         rt->host.args = calloc((size_t)arg_count, sizeof(char *));
         for (int i = 0; i < arg_count; i++) {
-            rt->host.args[i] = strdup(args[i]);
+            rt->host.args[i] = dup_string(args[i]);
         }
         rt->host.arg_count = arg_count;
     }
