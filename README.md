@@ -18,6 +18,11 @@ scripted in ES6. See `vision.md` for the product vision and
 - The engine JS API namespace `efx`: `efx.log(msg)`, `efx.quit(code)`,
   `efx.args()` — the binding pattern all future engine functions follow.
 
+## JavaScript API
+
+The normative script-facing API reference — current behavior plus the
+provisional F2–F8 catalog — lives in [`docs/js-api.md`](docs/js-api.md).
+
 ## Repository layout
 
 ```

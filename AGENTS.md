@@ -56,6 +56,8 @@ F6.
 - Memory rules: manage resources in JS where possible; unavoidable unmanaged
   resources are exposed as handles or pre-allocated slots
   (`setMesh(0, data); useMesh(0)`), to avoid leaks in a GC'd language.
+- Script-facing API changes require a `js-api` spec delta and a matching
+  `docs/js-api.md` update in the same change (see `docs/js-api.md`).
 
 ## Reference implementations
 
