@@ -72,7 +72,7 @@ API function with a signature sketch, a description, its layer tag, and the
 roadmap milestone (F1–F8) that delivers it. Entries for functions whose
 milestone has not passed its verification gate SHALL be explicitly marked
 provisional. The document SHALL also document the lifecycle hooks the entry
-script defines (`update`, `render`) and how API errors surface (exceptions,
+script defines (`init`, `update`, `render`) and how API errors surface (exceptions,
 exit codes). Any change that adds, modifies, or removes a public API function
 MUST update the document in the same change.
 

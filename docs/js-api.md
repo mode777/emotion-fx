@@ -55,23 +55,27 @@ Every rule below traces to vision.md or to F1's implemented behavior.
 
 ## Lifecycle hooks
 
-The entry script is `main.js` at the resource root (a zip in F6+). Top-level
-code runs once at load time, before the frame loop starts. The script may
-define these free globals, which the engine calls:
+The entry script is `main.js` at the resource root (a zip in F6+). The
+script may define these free globals, which the engine calls:
 
 ```js
-// F1 · script-provided (called by the engine, not by efx)
-function update(dt) { }  // once per frame, before render
-function render()    { } // once per frame
+// script-provided (called by the engine, not part of efx)
+function init()     { } // provisional — once, after the script is loaded, before the first frame
+function update(dt) { } // once per frame, before render
+function render()   { } // once per frame
 ```
 
-- Both hooks are optional; an undefined hook is skipped without error.
-- **F1 note:** the engine currently calls hooks with **no arguments**;
-  `update(dt)` — seconds since the previous frame — is the target contract,
-  ratified by the first milestone that needs timed behavior (F2). Adding the
-  argument is backward-compatible.
-- An uncaught exception inside a hook stops the frame loop and exits
-  non-zero.
+- All hooks are optional; an undefined hook is skipped without error.
+- **F1 current behavior:** the engine evaluates top-level `main.js` code once
+  at load time and calls `update`/`render` per frame with **no arguments**;
+  `init()` is not invoked yet.
+- **Target contract:** `init()` (setup needing the engine fully ready) and
+  `update(dt)` (`dt` = seconds since the previous frame) are ratified by the
+  next runtime change (F2 at the latest). Both are additive and
+  backward-compatible; until then, setup goes in top-level code. The F2–F8
+  samples below use them.
+- An uncaught exception inside a hook (or at load time) stops the run and
+  exits non-zero.
 
 ## Resource & memory model
 
@@ -146,9 +150,26 @@ efx.args()
 Returns a `string[]` of the arguments the host passed to the script run
 (the `--script <file> [args...]` tail). Empty array when none were given.
 
-The lifecycle hooks `update` and `render` are described in
+The lifecycle hooks `init`, `update`, and `render` are described in
 [Lifecycle hooks](#lifecycle-hooks); they are provided by the script, not
 part of `efx`.
+
+```js
+// main.js — F1 sample (current behavior only)
+let frames = 0;
+
+function update() {
+    frames++;
+    if (frames === 1) {
+        efx.log('hello from efx ' + efx.args().join(' '));
+    }
+    if (frames >= 60) {
+        efx.quit(0); // exits the player with code 0
+    }
+}
+
+function render() {}
+```
 
 ### F2 — 2D drawing (provisional)
 
@@ -168,6 +189,29 @@ efx.setBlendMode(mode)            // 'alpha' (default) | 'additive' | 'subtracti
   re-order for state changes — order is not a batching contract.
 - Blending covers additive and subtractive (vision.md); alpha is the default
   mode for ordinary 2D drawing.
+
+```js
+// main.js — F2 sample (provisional API)
+const LOGO = 0;
+let t = 0;
+
+function init() {
+    efx.setClearColor([0.08, 0.09, 0.12, 1]);
+    efx.setCamera2D({ x: 0, y: 0, zoom: 1 });
+    efx.setTexture(LOGO, { width: 64, height: 64, pixels: makeLogoPixels() });
+}
+
+function update(dt) {
+    t += dt;
+}
+
+function render() {
+    efx.setBlendMode('alpha');
+    efx.drawQuad(64, 64, 128, 128, { textureSlot: LOGO });
+    efx.setBlendMode('additive');
+    efx.drawQuad(224, 96, 64, 64, { color: [1, 0.5, 0, 1] });
+}
+```
 
 ### F3 — 3D core (provisional)
 
@@ -196,6 +240,30 @@ efx.quat.*  // quaternion helpers, delivered with F3 math, consumed by F7
 efx.makeCube(opts?)   // { size }
 efx.makePlane(opts?)  // { size, segments? }
 efx.makeSphere(opts?) // { radius, segments? }
+```
+
+```js
+// main.js — F3 sample (provisional API)
+const CUBE = 0;
+let yaw = 0;
+
+function init() {
+    efx.setClearColor([0.08, 0.09, 0.12, 1]);
+    efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });
+    efx.setMesh(CUBE, efx.makeCube({ size: 1 }));
+}
+
+function update(dt) {
+    yaw += dt * 45;
+}
+
+function render() {
+    efx.drawMesh({
+        mesh: CUBE,
+        transform: efx.mat4.rotate(efx.mat4.identity(), yaw, [0, 1, 0]),
+        color: [0.9, 0.4, 0.2, 1],
+    });
+}
 ```
 
 ### F4 — Materials & lights (provisional)
@@ -231,6 +299,29 @@ efx.setMaterial(mat)             // Phong channels:
 - `mat` is a **JS-managed** object; the engine reads it at `setMaterial`
   time. Re-calling `setMaterial` with a different object switches materials.
 
+```js
+// main.js — F4 sample (provisional API)
+const BALL = 0;
+
+function init() {
+    efx.setClearColor([0.05, 0.05, 0.08, 1]);
+    efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });
+    efx.setMesh(BALL, efx.makeSphere({ radius: 1, segments: 24 }));
+    efx.setLight(0, { pos: [3, 4, 2], color: [1, 0.95, 0.9, 1], range: 20 });
+    efx.setDirectionalLight({ dir: [-0.5, -1, -0.3], color: [0.2, 0.25, 0.35, 1] });
+    efx.setMaterial({
+        ambient:  { color: [0.05, 0.05, 0.05, 1] },
+        diffuse:  { color: [0.8, 0.3, 0.2, 1] },
+        specular: { color: [1, 1, 1, 1], shininess: 32 },
+        emissive: { color: [0, 0, 0, 1] },
+    });
+}
+
+function render() {
+    efx.drawMesh({ mesh: BALL });
+}
+```
+
 ### F5 — Render targets & post FX (provisional)
 
 Scope from roadmap F5: RTT, fullscreen-quad passes, color filter, blur.
@@ -250,6 +341,26 @@ efx.setColorFilter(opts)  // { brightness?, contrast?, saturation?, tint? } — 
 efx.setBlur(opts)         // { radius } — null disables
 ```
 
+```js
+// main.js — F5 sample (provisional API)
+let scene = null;
+
+function init() {
+    efx.setCamera2D({ x: 0, y: 0, zoom: 1 });
+    scene = efx.createRenderTarget({ width: 512, height: 512 });
+    efx.setColorFilter({ saturation: 0.6, contrast: 1.1 });
+    efx.setBlur({ radius: 2 });
+}
+
+function render() {
+    efx.beginRenderTarget(scene);
+    efx.drawQuad(96, 96, 320, 320, { color: [1, 0.4, 0.1, 1] });
+    efx.endRenderTarget();
+
+    efx.drawRenderTarget(scene, 256, 144, 512, 512);
+}
+```
+
 ### F6 — Resources (provisional)
 
 Scope from roadmap F6: zip resource root, real asset import (asset format
@@ -266,6 +377,21 @@ efx.loadMesh(path)           // → mesh data for efx.setMesh
 - The console/REPL run mode drives this same `efx` namespace interactively;
   no separate API.
 
+```js
+// main.js — F6 sample (provisional API)
+const MESH = 0;
+
+function init() {
+    efx.log(efx.loadText('data/welcome.txt'));
+    efx.setCamera3D({ pos: [0, 1, 4], target: [0, 0, 0], fov: 60 });
+    efx.setMesh(MESH, efx.loadMesh('models/teapot.mesh'));
+}
+
+function render() {
+    efx.drawMesh({ mesh: MESH });
+}
+```
+
 ### F7 — Skinning & animation (provisional)
 
 Scope from roadmap F7: CPU skinning into a mesh slot, skeleton/animation
@@ -275,6 +401,8 @@ import, play/pause/blend.
 // F7 · C · provisional
 efx.setSkeleton(slot, data)            // slot 0..SKELETON_SLOTS-1
 efx.setAnimation(slot, data)           // slot 0..ANIMATION_SLOTS-1
+efx.loadSkeleton(path)                 // → skeleton data for setSkeleton
+efx.loadAnimation(path)                // → animation data for setAnimation
 efx.playAnimation(skelSlot, opts?)     // { animation, loop?, speed? }
 efx.pauseAnimation(skelSlot)
 efx.blendAnimations(skelSlot, a, b, t) // blend pose of animations a and b at weight t
@@ -282,6 +410,29 @@ efx.blendAnimations(skelSlot, a, b, t) // blend pose of animations a and b at we
 
 - Skinning is computed on the CPU; the posed result is written into a mesh
   slot and drawn with the ordinary `efx.drawMesh`.
+
+```js
+// main.js — F7 sample (provisional API)
+const SKEL = 0, POSED = 1;
+let t = 0;
+
+function init() {
+    efx.setCamera3D({ pos: [0, 1.5, 4], target: [0, 1, 0], fov: 60 });
+    efx.setSkeleton(SKEL, efx.loadSkeleton('actors/hero.skel'));
+    efx.setAnimation(0, efx.loadAnimation('actors/hero.walk'));
+    efx.setAnimation(1, efx.loadAnimation('actors/hero.run'));
+    efx.playAnimation(SKEL, { animation: 0, loop: true });
+}
+
+function update(dt) {
+    t += dt;
+    efx.blendAnimations(SKEL, 0, 1, Math.min(1, t / 2)); // walk → run over 2s
+}
+
+function render() {
+    efx.drawMesh({ mesh: POSED }); // CPU skinning writes the posed mesh into slot 1
+}
+```
 
 ### F8 — High-level drawing (provisional)
 
@@ -291,10 +442,36 @@ built only on the public `[C]` API above.
 
 ```js
 // F8 · JS · provisional
+efx.loadFont(path)                   // → font for drawText (atlas built on quads)
 efx.drawModel(meshSlot, mat, opts?)  // { transform? } — one-call model drawing
                                      // over setMaterial + drawMesh
-efx.drawText(text, x, y, opts?)      // { font, size?, color? } — font atlas rendered
-                                     // as quads; font data via F6 loaders
+efx.drawText(text, x, y, opts?)      // { font, size?, color? } — text as quads
+```
+
+```js
+// main.js — F8 sample (provisional API)
+const MESH = 0;
+let yaw = 0;
+let font = null;
+
+function init() {
+    efx.setClearColor([0.08, 0.09, 0.12, 1]);
+    efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });
+    efx.setMesh(MESH, efx.loadMesh('models/teapot.mesh'));
+    font = efx.loadFont('fonts/perfect.ttf');
+}
+
+function update(dt) {
+    yaw += dt * 30;
+}
+
+function render() {
+    efx.drawModel(MESH, {
+        diffuse:  { color: [0.8, 0.3, 0.2, 1] },
+        specular: { color: [1, 1, 1, 1], shininess: 32 },
+    }, { transform: efx.mat4.rotate(efx.mat4.identity(), yaw, [0, 1, 0]) });
+    efx.drawText('score: 1200', 24, 24, { font, size: 32, color: [1, 1, 1, 1] });
+}
 ```
 
 ## Vision traceability
@@ -320,7 +497,7 @@ section (or an open question below):
 | REPL console mode | F6 (drives the same `efx` namespace) |
 | Skinning and animations | F7 |
 | High-level functions in pure JS (`drawModel`, `drawText`) | F8 |
-| Callbacks for update and rendering | Lifecycle hooks |
+| Callbacks for update and rendering | Lifecycle hooks (`init` extends this contract) |
 | Low/mid C + high-level JS layering | Overview (two layers), every entry tag |
 | No browser/Node dependencies (incl. transitively) | Conventions (Dependencies) |
 | Handles or pre-allocated slots for unmanaged resources | Resource & memory model |

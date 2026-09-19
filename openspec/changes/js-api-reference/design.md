@@ -32,7 +32,8 @@ not during — the first rendering change. See proposal.md for motivation.
 - Not settling deferred milestone internals: golden-image tolerance (F2),
   canned-shader strategy (F4), asset format (F6). The document references
   those decisions as pending where they touch API shape.
-- Not a tutorial or engine manual — a reference, with minimal examples.
+- Not a tutorial or engine manual — a reference; each milestone section
+  carries exactly one short, complete `main.js` sample (D10) and nothing more.
 
 ## Decisions
 
@@ -123,11 +124,24 @@ vision.md — are recorded in the document's "Open questions" section as links
 back to vision, **not** invented APIs. A vision→section traceability table
 makes the mapping checkable.
 
-### D9: Hook signature `update(dt)` documented as target contract
-The document records `update(dt)` / `render()` as the contract, noting that
-F1 currently calls hooks with no arguments and that `dt` delivery (seconds
-since previous frame) is ratified by the first milestone that needs timed
-behavior (F2) — additive and backward-compatible, so no F1 change is implied.
+### D9: Hook signatures `init()` / `update(dt)` documented as target contract
+The document records `init()` / `update(dt)` / `render()` as the contract.
+`init()` runs once after the script is loaded and before the first frame —
+setup that needs the engine fully ready, distinct from top-level `main.js`
+code which F1 evaluates at load time. F1 currently calls hooks with no
+arguments and does not invoke `init()` at all; `dt` (seconds since the
+previous frame) and `init()` are ratified by the next runtime change (F2 at
+the latest) — both additive and backward-compatible (hook absence is already
+tolerated). **Alternative rejected:** treating top-level code as init — it
+already has defined load-time semantics in F1 and cannot express "after the
+runtime is ready".
+
+### D10: One complete sample per milestone section
+Each milestone section (F1–F8) carries one short but complete `main.js`
+sample illustrating that milestone's catalog entries: the F1 sample uses
+only current behavior, the F2–F8 samples use their provisional APIs plus the
+`init()` hook. Samples are illustrative contracts-to-implement, not tested
+examples under `examples/`.
 
 ## Risks / Trade-offs
 

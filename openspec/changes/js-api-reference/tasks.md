@@ -15,3 +15,9 @@
 
 - [x] 3.1 Add a pointer to `docs/js-api.md` from README.md (Consumer API section) and a one-line doc-sync note in AGENTS.md (API changes require a `js-api` delta + document update in the same change); verify the links resolve
 - [x] 3.2 Run `openspec validate --change js-api-reference --strict` and confirm the change passes; re-read `docs/js-api.md` against the four `js-api` spec requirements (namespace rule, layer tags, resource classification + fixed limits, coverage/sync rules) and confirm each is satisfied in the delivered document
+
+## 4. Iteration: init hook + per-milestone samples
+
+- [x] 4.1 Document the `init` lifecycle hook in `docs/js-api.md` as a target contract (F1 invokes only `update`/`render` today); sync the `js-api` spec delta wording, design.md (D9/D10), and the proposal lifecycle bullet
+- [x] 4.2 Add one short but complete `main.js` sample to each milestone section F1–F8 (F1 sample uses current API only; F2–F8 samples use their provisional APIs and the `init` hook); extend F7 with `loadSkeleton`/`loadAnimation` and F8 with `loadFont` catalog entries so samples stay grounded
+- [x] 4.3 Run `openspec validate --change js-api-reference --strict` and confirm the change passes
