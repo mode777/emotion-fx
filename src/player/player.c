@@ -16,12 +16,12 @@ static int usage(void) {
 
 static int is_dir(const char *path) {
     struct stat st;
-    return stat(path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFDIR;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
 static int is_file(const char *path) {
     struct stat st;
-    return stat(path, &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
 }
 
 static int run_script_mode(const char *path, char *const *args, int arg_count) {
