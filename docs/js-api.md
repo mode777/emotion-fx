@@ -399,28 +399,36 @@ import, play/pause/blend.
 
 ```js
 // F7 · C · provisional
-efx.setSkeleton(slot, data)            // slot 0..SKELETON_SLOTS-1
+efx.setSkeleton(slot, data)            // slot 0..SKELETON_SLOTS-1 — joints + inverse bind matrices
 efx.setAnimation(slot, data)           // slot 0..ANIMATION_SLOTS-1
 efx.loadSkeleton(path)                 // → skeleton data for setSkeleton
 efx.loadAnimation(path)                // → animation data for setAnimation
+efx.setSkin(skelSlot, meshSlot)        // bind a skeleton to a skinned mesh slot
 efx.playAnimation(skelSlot, opts?)     // { animation, loop?, speed? }
 efx.pauseAnimation(skelSlot)
 efx.blendAnimations(skelSlot, a, b, t) // blend pose of animations a and b at weight t
 ```
 
-- Skinning is computed on the CPU; the posed result is written into a mesh
-  slot and drawn with the ordinary `efx.drawMesh`.
+- The skinning pipeline: a **skinned mesh** is ordinary F3 mesh data extended
+  with per-vertex `joints` + `weights` attributes, uploaded in bind pose via
+  `efx.setMesh`. `efx.setSkin` binds it to a skeleton; from then on every
+  frame the CPU computes the posed vertices **in place** and the bound mesh
+  slot always holds the current pose — `efx.drawMesh({ mesh })` renders it.
+- To keep the bind pose, upload the same data to a second mesh slot first;
+  skinning only rewrites the slot given to `setSkin`.
 
 ```js
 // main.js — F7 sample (provisional API)
-const SKEL = 0, POSED = 1;
+const SKEL = 0, HERO = 0; // HERO: mesh slot 0, starts as the bind pose
 let t = 0;
 
 function init() {
     efx.setCamera3D({ pos: [0, 1.5, 4], target: [0, 1, 0], fov: 60 });
+    efx.setMesh(HERO, efx.loadMesh('actors/hero.mesh')); // bind pose + joints/weights
     efx.setSkeleton(SKEL, efx.loadSkeleton('actors/hero.skel'));
     efx.setAnimation(0, efx.loadAnimation('actors/hero.walk'));
     efx.setAnimation(1, efx.loadAnimation('actors/hero.run'));
+    efx.setSkin(SKEL, HERO); // posed vertices are written back into slot 0 each frame
     efx.playAnimation(SKEL, { animation: 0, loop: true });
 }
 
@@ -430,7 +438,7 @@ function update(dt) {
 }
 
 function render() {
-    efx.drawMesh({ mesh: POSED }); // CPU skinning writes the posed mesh into slot 1
+    efx.drawMesh({ mesh: HERO }); // renders the current CPU-skinned pose
 }
 ```
 

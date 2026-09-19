@@ -21,3 +21,7 @@
 - [x] 4.1 Document the `init` lifecycle hook in `docs/js-api.md` as a target contract (F1 invokes only `update`/`render` today); sync the `js-api` spec delta wording, design.md (D9/D10), and the proposal lifecycle bullet
 - [x] 4.2 Add one short but complete `main.js` sample to each milestone section F1–F8 (F1 sample uses current API only; F2–F8 samples use their provisional APIs and the `init` hook); extend F7 with `loadSkeleton`/`loadAnimation` and F8 with `loadFont` catalog entries so samples stay grounded
 - [x] 4.3 Run `openspec validate --change js-api-reference --strict` and confirm the change passes
+
+## 5. Iteration: F7 skinning clarity
+
+- [x] 5.1 Fix the F7 sample's undefined `POSED` mesh slot: add `efx.setSkin(skelSlot, meshSlot)` (in-place skinning pipeline) to the F7 catalog, document skinned mesh data (`joints`/`weights` attributes on the F3 mesh shape), rewrite the sample around one bound mesh slot, and confirm `openspec validate --strict` passes
