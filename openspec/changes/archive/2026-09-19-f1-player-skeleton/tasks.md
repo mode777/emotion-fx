@@ -23,7 +23,7 @@ js-runtime, verification).
 - [x] 3.1 Implement CLI parsing and run-mode selection in the player module with the exit-code contract (0 success, 1 generic failure, else script-requested code); verify usage/missing-argument invocations exit non-zero with a stderr diagnostic
 - [x] 3.2 Implement `--script <file> [args…]` headless mode: no sokol initialization, evaluate, propagate quit code; verify with a scratch script that `efx.quit(3)` makes the process exit 3, and a missing file exits non-zero with a stderr message
 - [x] 3.3 Implement resource-root mode script loading: resolve the root directory, require `main.js` (diagnostic + non-zero if absent), evaluate it once; verify with a fixture directory containing a trivial `main.js` (loads and exits 0 via `efx.quit(0)`) and a fixture without `main.js` (non-zero + stderr)
-- [ ] 3.4 Implement the platform module: sokol window + clear-color pass + frame callback, linked only into resource-root mode (D3/D7); verify on the host that launching the fixture root opens a window with the clear color and closes cleanly with exit 0
+- [x] 3.4 Implement the platform module: sokol window + clear-color pass + frame callback, linked only into resource-root mode (D3/D7); verify on the host that launching the fixture root opens a window with the clear color and closes cleanly with exit 0
 - [x] 3.5 Implement hook pickup and dispatch: look up `update`/`render` once after evaluation, call them per frame in order, skip missing hooks, and on an uncaught hook exception stop the loop, print to stderr, exit non-zero; verify on the host with a scratch main.js defining both hooks plus a throwing-hooks variant
 
 ## 4. Emscripten target
@@ -39,15 +39,15 @@ js-runtime, verification).
 
 ## 6. Example and docs
 
-- [ ] 6.1 Create `examples/hello/` resource root with a `main.js` defining `update`/`render` (window + clear color demo, no drawing API); verify it runs manually on the host and exits 0 on window close
+- [x] 6.1 Create `examples/hello/` resource root with a `main.js` defining `update`/`render` (window + clear color demo, no drawing API); verify it runs manually on the host and exits 0 on window close
 - [x] 6.2 Document per-target build commands and the F1 gate procedure (build matrix, `ctest`, manual window checklist) in the repo README; verify the documented commands match what tasks 1–5 actually used
 
 ## 7. F1 gate (broader verification, executed via CI per D8)
 
 - [x] 7.1 Build matrix: the CI workflow builds the player on Windows, Linux, macOS, and Emscripten; verify all four CI jobs produce a runnable player artifact per the build-system spec
 - [x] 7.2 Run the full smoke suite via `ctest` in CI on all four targets; verify zero failures per the verification spec's four-target gate
-- [ ] 7.3 Execute the manual window checklist on each desktop platform (window opens, hooks run per frame, missing hook tolerated, clean exit 0 on close); verify results are recorded
-- [ ] 7.4 After 7.1–7.3 pass, flip the F1 row to done in the AGENTS.md roadmap status table; verify the table matches reality
+- [x] 7.3 Execute the manual window checklist on each desktop platform (window opens, hooks run per frame, missing hook tolerated, clean exit 0 on close); verify results are recorded
+- [x] 7.4 After 7.1–7.3 pass, flip the F1 row to done in the AGENTS.md roadmap status table; verify the table matches reality
 
 ## 8. GitHub Actions gate runner (added during apply, per D8)
 
@@ -58,4 +58,4 @@ js-runtime, verification).
 
 - [x] 9.1 Add a browser-compatible `player_web` Emscripten target (no Node raw FS, preloaded `examples/browser` resource root, canvas shell output) without changing the Node-based test build; verify the pages CI job builds it and emits html/js/wasm/data
 - [x] 9.2 Deploy the web player to GitHub Pages on every push to main (repo made public, Pages build_type=workflow); verify the deployed page serves index.html, player_web.js, player_web.wasm, and player_web.data with HTTP 200 (https://mode777.github.io/emotion-fx/)
-- [ ] 9.3 User visually verifies the deployed page: canvas shows the dark blue-grey clear color and the browser console shows `browser hello` frame logs advancing; record the result
+- [x] 9.3 User visually verifies the deployed page: canvas shows the dark blue-grey clear color and the browser console shows `browser hello` frame logs advancing; record the result
