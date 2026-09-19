@@ -28,8 +28,8 @@ js-runtime, verification).
 
 ## 4. Emscripten target
 
-- [ ] 4.1 Add the Emscripten build (emcmake toolchain, `.js` + `.wasm` output, single player artifact per build-system spec) using the same core sources; verify the emscripten CI job configures and builds (local container has no emsdk)
-- [ ] 4.2 Verify the Emscripten `--script` mode runs headless under Node with exit codes propagating (D4); verify the emscripten CI smoke-test job passes the quit(3) and throwing-script tests
+- [x] 4.1 Add the Emscripten build (emcmake toolchain, `.js` + `.wasm` output, single player artifact per build-system spec) using the same core sources; verify the emscripten CI job configures and builds (local container has no emsdk)
+- [x] 4.2 Verify the Emscripten `--script` mode runs headless under Node with exit codes propagating (D4); verify the emscripten CI smoke-test job passes the quit(3) and throwing-script tests
 
 ## 5. Smoke-test suite and harness
 
@@ -40,16 +40,16 @@ js-runtime, verification).
 ## 6. Example and docs
 
 - [ ] 6.1 Create `examples/hello/` resource root with a `main.js` defining `update`/`render` (window + clear color demo, no drawing API); verify it runs manually on the host and exits 0 on window close
-- [ ] 6.2 Document per-target build commands and the F1 gate procedure (build matrix, `ctest`, manual window checklist) in the repo README; verify the documented commands match what tasks 1–5 actually used
+- [x] 6.2 Document per-target build commands and the F1 gate procedure (build matrix, `ctest`, manual window checklist) in the repo README; verify the documented commands match what tasks 1–5 actually used
 
 ## 7. F1 gate (broader verification, executed via CI per D8)
 
-- [ ] 7.1 Build matrix: the CI workflow builds the player on Windows, Linux, macOS, and Emscripten; verify all four CI jobs produce a runnable player artifact per the build-system spec
-- [ ] 7.2 Run the full smoke suite via `ctest` in CI on all four targets; verify zero failures per the verification spec's four-target gate
+- [x] 7.1 Build matrix: the CI workflow builds the player on Windows, Linux, macOS, and Emscripten; verify all four CI jobs produce a runnable player artifact per the build-system spec
+- [x] 7.2 Run the full smoke suite via `ctest` in CI on all four targets; verify zero failures per the verification spec's four-target gate
 - [ ] 7.3 Execute the manual window checklist on each desktop platform (window opens, hooks run per frame, missing hook tolerated, clean exit 0 on close); verify results are recorded
 - [ ] 7.4 After 7.1–7.3 pass, flip the F1 row to done in the AGENTS.md roadmap status table; verify the table matches reality
 
 ## 8. GitHub Actions gate runner (added during apply, per D8)
 
 - [x] 8.1 Author `.github/workflows/ci.yml`: native matrix (ubuntu/windows/macos) + Emscripten job, each configure → build → ctest; verify the workflow file is valid YAML and triggers on push to main
-- [ ] 8.2 Push and confirm a fully green run: all four jobs build and pass the smoke suite; verify via the Actions run summary
+- [x] 8.2 Push and confirm a fully green run: all four jobs build and pass the smoke suite; verify via the Actions run summary (https://github.com/mode777/emotion-fx/actions/runs/35457715867)
