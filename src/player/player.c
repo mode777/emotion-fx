@@ -6,6 +6,14 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#ifdef _WIN32
+#define EFX_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#define EFX_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#else
+#define EFX_ISDIR(m) S_ISDIR(m)
+#define EFX_ISREG(m) S_ISREG(m)
+#endif
+
 static int usage(void) {
     fprintf(stderr,
             "usage:\n"
@@ -16,12 +24,12 @@ static int usage(void) {
 
 static int is_dir(const char *path) {
     struct stat st;
-    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+    return stat(path, &st) == 0 && EFX_ISDIR(st.st_mode);
 }
 
 static int is_file(const char *path) {
     struct stat st;
-    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+    return stat(path, &st) == 0 && EFX_ISREG(st.st_mode);
 }
 
 static int run_script_mode(const char *path, char *const *args, int arg_count) {
