@@ -1,31 +1,49 @@
 # AGENTS.md
 
-Preliminary guidance — the project is **pre-implementation**. The only source of
-truth is `vision.md`; read it before proposing anything. Do not assume build
-commands, directory layouts, or toolchains that don't exist yet.
+Guidance for agents working in this repo. The product source of truth is
+`vision.md`; read it before proposing anything. Work flows through the
+OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
+(propose → apply → archive) — rather than ad-hoc coding.
 
 ## Current state
 
-- No source code, no CMake file, no tests yet. `package.json` exists only to
-  install the OpenSpec CLI (`npm install`, then `npx openspec`).
-- Specs live under `openspec/`. Work is driven through the OpenSpec SDD flow —
-  use the `opsx-*` / `openspec-*` commands and skills (propose → apply →
-  archive) rather than coding ad-hoc.
+- F1 (player skeleton) is **done**; F2 (2D layer) is next. The normative
+  milestone ladder is `openspec/specs/feature-roadmap`; the table below
+  summarizes it.
+- `src/` is a single core static library with four internal modules
+  (`platform`, `runtime`, `api`, `player`) plus a thin `main.c`
+  (ADR 0003). Sokol and quickjs-ng are vendored pinned snapshots under
+  `vendor/` (`vendor/README.md`, ADR 0006).
+- The `efx` player binary has two run modes (ADR 0007): windowed
+  (`player <resource-root>`, runs `main.js`'s `update`/`render` hooks)
+  and headless (`player --script <file> [args…]`, exit-code contract).
+  Example resource roots: `examples/hello/`, `examples/browser/`.
+- The script-facing API so far is `efx.log`, `efx.quit`, `efx.args`
+  (ADR 0004), cataloged in `docs/js-api.md`.
+- `.github/workflows/ci.yml` is the four-target gate (ADR 0009): CMake
+  build + ctest smoke suite on Linux/Windows/macOS plus an Emscripten
+  job. `tests/` holds the suite; test scripts assert via exit codes
+  only (ADR 0007/0008).
+- `package.json` exists only to install the OpenSpec CLI (`npm install`,
+  then `npx openspec`).
 
-## Planned stack (from vision.md — not yet built)
+## Stack
 
-- C/C++ core, rendering via **Sokol**; **QuickJS** embedded as the ES6 runtime
-  on native platforms; Emscripten bridge for the browser (no Node).
-- Build system will be CMake; targets: Win, Linux, macOS, Emscripten; output is
-  a single binary "player" for a resource folder/zip with a `main.js` entry
-  (godot `res://`-style resource root).
+- C11 core (ADR 0001); rendering via **Sokol** — fixed-function only,
+  no programmable shaders, ever; **quickjs-ng** embedded as the ES6
+  runtime (ADR 0002); Emscripten bridge for the browser.
+- Build system is CMake; targets: Windows, Linux, macOS, Emscripten;
+  output is a single binary "player" for a resource folder/zip with a
+  `main.js` entry (godot `res://`-style resource root).
+- Math: **GLM**, integrated in F3 behind a plain C wrapper (ADR 0005).
 
 ## Roadmap
 
-`vision.md` decomposes into a fixed ladder of milestones — the normative spec is
-`openspec/specs/feature-roadmap`. The order is fixed: a milestone must not start
-before its predecessor's verification gate passes on all four targets, and every
-feature proposal must name the milestone it implements.
+`vision.md` decomposes into a fixed ladder of milestones — the normative
+spec is `openspec/specs/feature-roadmap`. The order is fixed: a milestone
+must not start before its predecessor's verification gate passes on all
+four targets, and every feature proposal must name the milestone it
+implements.
 
 | # | Milestone | Scope (one line) | Verification gate | Status |
 |---|-----------|------------------|-------------------|--------|
@@ -38,10 +56,11 @@ feature proposal must name the milestone it implements.
 | F7 | Skinning + animation | CPU skinning into a mesh slot, skeleton/animation import, play/pause/blend | FK joint-transform tests vs CPU reference + golden images | planned |
 | F8 | High-level JS + text | `drawModel`, `drawText` (font atlas built on quads), demo resource pack | Golden images; demo pack runs end-to-end on all four targets | planned |
 
-Deferred cross-cutting decisions settle inside specific milestones, not before:
-toolchain/QuickJS flavor/math library in F1, golden-image tolerance + CI
-determinism in F2, canned-shader strategy by F4 at the latest, asset format in
-F6.
+Deferred cross-cutting decisions settle inside specific milestones, not
+before: golden-image tolerance + CI determinism (incl. emsdk pinning) in
+F2, canned-shader strategy by F4 at the latest, asset format in F6.
+F1's deferred set (toolchain, quickjs flavor, math library) is settled —
+see `docs/decisions/`.
 
 ## Non-negotiable design constraints (easy to get wrong)
 
@@ -59,6 +78,25 @@ F6.
 - Script-facing API changes require a `js-api` spec delta and a matching
   `docs/js-api.md` update in the same change (see `docs/js-api.md`).
 
+## Documentation
+
+- `vision.md` — product goals; the source of truth for intent.
+- `docs/js-api.md` — the script-facing API catalog; updated in the same
+  change as any API delta.
+- `docs/decisions/` — architecture decision records (ADRs): the durable
+  *why* behind cross-cutting invariants (language, runtime, module
+  walls, binding pattern, vendoring, run modes, CI).
+- `openspec/specs/` — required behavior; `openspec/changes/` — full
+  design/process records per change.
+
+Dividing rule: `openspec/specs/` pin required behavior, `docs/` hold
+invariants and rationale, this file points rather than restates. When
+work settles a durable architecture decision — a trade-off future
+changes must respect — document it as a short ADR in `docs/decisions/`
+(new numbered file + a row in its index). Full design/process records
+stay in `openspec/changes/`; the ADR extracts only what outlives the
+change.
+
 ## Reference implementations
 
 Use these when designing, don't reinvent: sokol-samples (rendering patterns),
@@ -66,7 +104,8 @@ rayjs (QuickJS integration + stripping QuickJS for cross-platform).
 
 ## Not yet decided
 
-Toolchain details, test strategy, CI, and repo layout are open questions —
-settle them via OpenSpec proposals, not by silently picking defaults. The
-Roadmap section above assigns each deferred decision a latest-settling
+Golden-image tolerance and CI determinism (F2), the canned-shader
+strategy (by F4 at the latest), and the asset format (F6) are open —
+settle them via OpenSpec proposals, not by silently picking defaults.
+The Roadmap section assigns each deferred decision a latest-settling
 milestone.

@@ -2,31 +2,55 @@ schema: spec-driven
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Tech stack: C11 core (ADR 0001) rendering via Sokol — fixed-function
+  only, no programmable shaders, ever; quickjs-ng embedded as the ES6
+  runtime (ADR 0002, no quickjs-libc); Emscripten bridge for the browser.
+  CMake build for Windows/Linux/macOS/Emscripten; output is a single
+  `efx` player binary for a resource root with a `main.js` entry. GitHub
+  Actions is the four-target gate (CMake build + ctest smoke suite,
+  ADR 0009).
+
+  Domain: EmotionFX is a fixed-function renderer with an embedded ES6
+  scripting layer. Immediate-mode JS API on one global `efx` object
+  (ADR 0004); rendering goes through a re-orderable display list; fixed
+  limits: 4 point lights + 1 directional light, 1 camera. Game scripts
+  are pure ES6 with zero browser/Node dependencies, even transitively
+  (Node is a test launcher only, ADR 0008).
+
+  Doc map: vision.md (product goals), docs/js-api.md (script-facing API
+  catalog — update in the same change as any API delta),
+  docs/decisions/ (ADRs — the durable why behind cross-cutting
+  invariants). openspec/specs/ pin required behavior; docs hold
+  invariants and rationale; AGENTS.md points rather than restates.
+
+  Milestones F1–F8 form a fixed ladder
+  (openspec/specs/feature-roadmap): a milestone must not start before
+  its predecessor's verification gate passes on all four targets, and
+  every feature proposal names the milestone it implements. Deferred
+  decisions settle in their assigned milestone (golden-image tolerance
+  + CI determinism: F2; canned-shader strategy: F4 at the latest; asset
+  format: F6).
 
 # Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Name the milestone (F1–F8) this change implements
+    - Name the affected docs (js-api.md, decisions) and state explicitly whether an ADR is needed ("No ADR — reason" vs "new ADR docs/decisions/NNNN")
+    - State explicitly what is out of scope (Non-goals)
+  tasks:
+    - When the change settles a durable architecture decision, include an explicit task to write the ADR (docs/decisions/NNNN per TEMPLATE.md) and add it to the docs/decisions/README.md index
+    - Include a docs update task whenever invariants, the script-facing API (docs/js-api.md), or the roadmap/current-state sections of AGENTS.md change
+    - Include a verification task naming the harness (ctest smoke suite; golden-image harness once F2 lands it) per the milestone's verification gate
+  design:
+    - Record rejected alternatives with the reason they lost
+    - State how unmanaged resources are exposed to scripts: pre-allocated slots/handles (setMesh(0, data); useMesh(0)), never GC-managed C objects
 
 # Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+operations:
+  apply:
+    guidance:
+      - If a durable decision is settled during apply that the proposal did not anticipate, record it in the design doc and note whether an ADR must follow before archive
+  archive:
+    guidance:
+      - Before archiving, confirm any ADR the change promised is written in docs/decisions/ and indexed in docs/decisions/README.md
