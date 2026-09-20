@@ -19,7 +19,7 @@ not during — the first rendering change. See proposal.md for motivation.
 - One normative document (`docs/js-api.md`) covering the entire script API
   from F1 through F8, machine-greppable and diff-friendly.
 - Settle cross-milestone conventions now: namespace, naming, parameter style,
-  units, error style, resource/memory model, slot-vs-handle classification.
+  units, error style, resource/memory model, resource classification.
 - Make every catalog entry traceable to vision.md and to the milestone that
   delivers it, so later changes extend rather than re-decide.
 - Keep the document honest: current behavior (F1) visibly separated from
@@ -89,21 +89,26 @@ built-in behavior, and `--script` smoke tests can `try/catch` naturally.
 **Alternative rejected:** C-style status codes / null returns — un-idiomatic
 and easy to ignore in game scripts.
 
-### D6: Resource model defaults per family
-- **JS-managed:** materials (plain objects passed to `efx.setMaterial`),
+### D6: Resource model — classes for dynamic counts, slots for the light bank
+- **JS-managed:** materials (plain objects read by `efx.setMaterial`),
   mesh/vertex data before upload, colors, transforms — created and dropped
   freely, GC handles lifetime.
-- **Slot-based (default for native storage):** textures, meshes, lights —
-  fixed-index upload (`efx.setTexture(slot, texData)`, `efx.setMesh(slot,
-  data)`), matching vision.md's `setMesh(0, data); useMesh(0)` rule. Slot
-  counts appear in a limits table; counts for future milestones are listed
-  with provisional values and are pinned by the delivering milestone's
-  change.
-- **Handle-based:** reserved for resources whose working-set size is genuinely
-  dynamic — render targets are the expected F5 case. Handles carry an explicit
-  `efx.destroy*(handle)`; the document states leak rules per family.
-- Fixed limits table: 4 point lights, 1 directional light, 1 camera (from
-  vision.md), plus slot counts per family.
+- **Native-backed classes** (textures, meshes, render targets, skeletons,
+  animations, fonts): opaque GC-finalized JS objects wrapping native
+  handles — query methods (`tex.width`), idempotent `destroy()` as the
+  deterministic release path, finalizer as backstop, finalization at
+  shutdown. `create*`/`load*` calls return them. Native byte cost counts
+  toward GC pressure and the player collects at frame end, so unreferenced
+  resources are reclaimed within roughly a frame even without `destroy()`
+  (ADR 0012). The display list pins recorded objects; `destroy()` mid-frame
+  defers the native release to frame end.
+- **Slot-based:** the light bank only — 4 point slots + 1 directional
+  (fixed limits from vision.md). The earlier texture/mesh/skeleton slot
+  banks and their slot-count tables are dropped: those counts were
+  provisional constants solving an allocation problem that classes remove.
+- Fixed limits table: 4 point lights, 1 directional light, 1 camera.
+Rationale, consequences, and rejected alternatives: ADR 0011 (model) and
+ADR 0012 (memory discipline).
 
 ### D7: High-level JS layer ships inside the player
 Pure-JS high-level functions (`efx.drawModel`, `efx.drawText`, procedural
@@ -143,6 +148,15 @@ only current behavior, the F2–F8 samples use their provisional APIs plus the
 `init()` hook. Samples are illustrative contracts-to-implement, not tested
 examples under `examples/`.
 
+### D11: Math representation — plain JS data at the boundary, GLM internal
+The F3 math entries (`efx.mat4`/`efx.vec3`/`efx.quat`) are pure JS over
+column-major `Float32Array`s, and every math-taking API call accepts plain
+arrays, converting in C once per call. GLM (ADR 0005) never reaches scripts.
+Full rationale, consequences, and rejected alternatives live in
+`docs/decisions/0010-script-math-is-plain-js-data.md`; the `docs/js-api.md`
+catalog text is left unchanged here — a follow-up API update will fold the
+representation into the entries.
+
 ## Risks / Trade-offs
 
 - [Forward-declared provisional signatures drift from what milestones finally
@@ -172,7 +186,5 @@ is removed by archiving or by a later change if the approach is abandoned.
   questions rather than speculatively designed. If vision grows these
   capabilities, they enter the catalog through a future change with a
   `js-api` delta.
-- Exact slot counts per family (textures, meshes, render targets): provisional
-  until F2/F5 pin them.
 - REPL-facing API surface (F6): the REPL drives the same `efx` namespace;
   whether it needs extra introspection helpers is deferred to F6.

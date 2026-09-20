@@ -73,8 +73,9 @@ see `docs/decisions/`.
   `drawText`…).
 - JS code must have **zero browser/Node dependencies, not even transitively**.
 - Memory rules: manage resources in JS where possible; unavoidable unmanaged
-  resources are exposed as handles or pre-allocated slots
-  (`setMesh(0, data); useMesh(0)`), to avoid leaks in a GC'd language.
+  resources are exposed as GC-finalized opaque classes with explicit
+  `destroy()` (textures, meshes, … — ADR 0011, discipline ADR 0012) or as
+  fixed pre-allocated banks (lights), to avoid leaks in a GC'd language.
 - Script-facing API changes require a `js-api` spec delta and a matching
   `docs/js-api.md` update in the same change (see `docs/js-api.md`).
 

@@ -25,3 +25,13 @@
 ## 5. Iteration: F7 skinning clarity
 
 - [x] 5.1 Fix the F7 sample's undefined `POSED` mesh slot: add `efx.setSkin(skelSlot, meshSlot)` (in-place skinning pipeline) to the F7 catalog, document skinned mesh data (`joints`/`weights` attributes on the F3 mesh shape), rewrite the sample around one bound mesh slot, and confirm `openspec validate --strict` passes
+
+## 6. Iteration: math representation decision
+
+- [x] 6.1 Record the math-representation strict split as ADR 0010 (`docs/decisions/0010-script-math-is-plain-js-data.md`) + index row; add design.md D11 referencing it; leave `docs/js-api.md` untouched (API update deferred to a follow-up); confirm `openspec validate --strict` passes
+
+## 7. Iteration: resource model — classes over slots
+
+- [x] 7.1 Write ADR 0011 (`docs/decisions/0011-dynamic-resources-are-gc-finalized-classes.md`: dynamic-count resources as opaque GC-finalized JS classes with idempotent `destroy()`; slots only for the fixed light bank; display-list pinning) and ADR 0012 (`docs/decisions/0012-native-memory-gc-discipline.md`: native bytes counted into GC pressure via allocator hooks, frame-end collection, destroy-first/finalizer-backstop); add both to the decisions index
+- [x] 7.2 Sync artifacts: rewrite the `js-api` resource requirement (new classification classes, memory discipline, display-list liveness scenarios), update the proposal's resource-model bullet, rewrite design.md D6 and prune obsolete slot-count material
+- [x] 7.3 Rework `docs/js-api.md`: Conventions resource bullet, Resource & memory model section (classes table, lifecycle rules, limits; slot-count table removed), F2–F8 catalog entries and samples on the class-based model (`createTexture`/`createMesh`/class render targets/`createSkeleton`/`createAnimation`/Animation-object `playAnimation`/`blendAnimations`, `loadTexture` as `[JS]` convenience), drop the slot-counts open question; run `openspec validate --strict`

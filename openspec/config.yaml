@@ -44,7 +44,7 @@ rules:
     - Include a verification task naming the harness (ctest smoke suite; golden-image harness once F2 lands it) per the milestone's verification gate
   design:
     - Record rejected alternatives with the reason they lost
-    - State how unmanaged resources are exposed to scripts: pre-allocated slots/handles (setMesh(0, data); useMesh(0)), never GC-managed C objects
+    - State how unmanaged resources are exposed to scripts: dynamic-count resources as GC-finalized opaque classes with explicit destroy() (ADR 0011, memory discipline ADR 0012); fixed banks (lights) as pre-allocated slots
 
 # Per-operation guidance (optional)
 operations:

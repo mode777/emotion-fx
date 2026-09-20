@@ -37,9 +37,12 @@ instead of making ad-hoc naming decisions inside its own change.
     and post FX, resource loading, skinning/animation, high-level
     `drawModel`/`drawText`), each entry tagged with its delivery milestone and
     implementation layer (`[C]` low/mid-level, `[JS]` high-level pure JS).
-  - Resource & memory model: JS-managed objects vs pre-allocated slots vs
-    explicit handles, with the fixed-limits table (4 point lights + 1
-    directional, 1 camera, slot counts).
+  - Resource & memory model: JS-managed data objects, native-backed
+    GC-finalized resource classes with explicit `destroy()` (textures,
+    meshes, render targets, skeletons, animations, fonts), and slot banks
+    reserved for the fixed light limits — fixed-limits table (4 point
+    lights, 1 directional, 1 camera) plus the native-memory GC discipline
+    (per ADRs 0011/0012).
   - Error handling and exit-code interaction of API calls.
 - Add a new `js-api` capability spec that makes this reference normative: the
   layering rules, namespace rule, dependency rule, memory-model rules, and the

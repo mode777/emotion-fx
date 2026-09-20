@@ -47,22 +47,41 @@ reference SHALL be tagged with its layer.
 ### Requirement: Resource classification and fixed limits
 Every engine resource type that scripts can create or reference SHALL be
 classified in the reference as exactly one of: JS-managed (plain script
-objects, garbage collected), slot-based (a fixed pre-allocated set of indexed
-resources, e.g. `setMesh(slot, data)`), or handle-based (explicit creation
-and destruction). Every resource requiring native storage MUST be either
-slot-based or handle-based with a documented release path. The reference
-SHALL document the engine's fixed limits, including 4 point lights, 1
-directional light, and 1 camera, and SHALL document slot counts as explicit
-constants.
+objects, garbage collected), native-backed class (an opaque JS object
+wrapping a native handle, with query methods and an explicit `destroy()`
+release method), or slot-based (a fixed pre-allocated bank of indexed
+resources). Every resource requiring native storage MUST be a native-backed
+class — released deterministically by its `destroy()`, reclaimed by its GC
+finalizer if the script never calls it, and finalized at runtime teardown —
+unless its count is fixed by design, in which case it is slot-based. The
+runtime MUST factor native allocation sizes into GC pressure and MUST run
+collection at frame end, bounding unreferenced native waste to roughly one
+frame. Resources recorded into the display list MUST stay alive until
+playback completes. The reference SHALL document the engine's fixed limits:
+4 point lights, 1 directional light, and 1 camera; lights are the only slot
+bank.
 
 #### Scenario: Fixed limits stated
 - **WHEN** the reference document's limits section is read
 - **THEN** it states 4 point lights, 1 directional light, and 1 camera,
   matching vision.md
 
+#### Scenario: Unreleased native resource is reclaimed
+- **WHEN** a script creates textures in a loop and never calls
+  `destroy()` on them
+- **THEN** the native sizes drive GC pressure, finalizers reclaim the
+  objects within roughly a frame of them becoming unreachable, and nothing
+  leaks at runtime shutdown
+
+#### Scenario: Destroyed resource is safe
+- **WHEN** a script calls `destroy()` on a resource that the display list
+  recorded earlier in the same frame
+- **THEN** the native release is deferred until playback completes, and
+  subsequent use of the destroyed resource throws
+
 #### Scenario: Resource without a classification
 - **WHEN** a change proposes exposing a new resource type to scripts without
-  classifying it as JS-managed, slot-based, or handle-based
+  classifying it as JS-managed, native-backed class, or slot-based
 - **THEN** the change is incomplete and MUST NOT update the API reference
 
 ### Requirement: Normative API reference document

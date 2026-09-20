@@ -37,8 +37,11 @@ Every rule below traces to vision.md or to F1's implemented behavior.
   and never behind imports. The only free globals a script interacts with are
   the lifecycle hooks it *provides* (see below).
 - **Naming**: camelCase, verb-first. `set*`/`get*` configure engine state,
-  `draw*` record into the display list, `make*` build data in JS, `load*`
-  fetch data from the resource root, `destroy*` release handles.
+  `draw*` record into the display list, `make*` build data in JS,
+  `load*`/`create*` fetch or upload resources and return resource objects.
+- **Resources**: loaders and creators return opaque resource objects with
+  query methods; `res.destroy()` releases deterministically, GC is the
+  backstop (see [Resource & memory model](#resource--memory-model)).
 - **Parameters**: hot immediate-mode calls take scalar arguments first
   (`drawQuad(x, y, w, h, opts?)`); configuration beyond ~3 values goes in a
   trailing option object so signatures can grow without breaking calls.
@@ -80,24 +83,40 @@ function render()   { } // once per frame
 ## Resource & memory model
 
 Every resource type scripts can create or reference is classified exactly
-one way — this is the rule that keeps a GC'd language from leaking unmanaged
-memory (vision.md):
+one way — the rule that keeps a GC'd language from leaking unmanaged memory
+(vision.md). Dynamic-count resources are opaque **native-backed classes**;
+only the fixed light bank is slot-based (rationale: ADR 0011; memory
+discipline: ADR 0012, both under `docs/decisions/`).
 
 | Class | Meaning | Release path |
 |---|---|---|
-| **JS-managed** | Plain script objects; garbage collected | Drop the reference |
-| **Slot-based** | Fixed pre-allocated set of indexed native resources | Overwrite the slot (`setMesh(slot, data)`) |
-| **Handle-based** | Dynamically created native resource | Explicit `destroy*(handle)` |
+| **JS-managed** | Plain data objects; garbage collected | Drop the reference |
+| **Native-backed class** | Opaque object wrapping a native handle; query methods; GC finalizer backstop | `res.destroy()` (primary), GC / shutdown (backstop) |
+| **Slot-based** | Fixed pre-allocated bank of indexed resources | Overwrite the slot |
 
 | Resource | Class | Delivered | Notes |
 |---|---|---|---|
 | Materials (Phong parameter objects) | JS-managed | F4 | Passed to `efx.setMaterial` |
-| Mesh/vertex data before upload | JS-managed | F3 | Output of `make*` / input to `setMesh` |
-| Meshes (native storage) | Slot-based | F3 | `efx.setMesh(slot, data)` |
-| Textures | Slot-based | F2 | `efx.setTexture(slot, data)` |
+| Mesh/vertex data before upload | JS-managed | F3 | Output of `make*` / input to `createMesh` |
+| Textures | Native class | F2 | `createTexture` / `loadTexture` (F6); `tex.width`, `tex.destroy()` |
+| Meshes | Native class | F3 | `createMesh` / `loadMesh` (F6); `mesh.destroy()` |
 | Lights | Slot-based | F4 | 4 point slots + 1 directional (fixed) |
-| Render targets | Handle-based | F5 | `createRenderTarget` / `destroyRenderTarget` |
-| Skeletons / animations | Slot-based | F7 | `setSkeleton` / `setAnimation` |
+| Render targets | Native class | F5 | `createRenderTarget`; `rt.destroy()` |
+| Skeletons / animations | Native class | F7 | `load*` / `create*`; `.destroy()` |
+| Fonts | Native class | F8 | `loadFont`; `font.destroy()` |
+
+**Resource lifecycle rules:**
+
+- `destroy()` is deterministic and idempotent; using a destroyed resource
+  throws.
+- Native byte cost counts toward GC pressure and the player collects at
+  frame end — unreferenced native resources are reclaimed within roughly a
+  frame even if the script never calls `destroy()`.
+- Resources recorded into the display list stay alive until playback
+  finishes; `destroy()` during a frame defers the native release to frame
+  end.
+- Everything still alive at shutdown is finalized by runtime teardown —
+  scripts cannot leak past process exit.
 
 **Fixed limits** (vision.md — not configurable):
 
@@ -106,15 +125,6 @@ memory (vision.md):
 | Point lights | 4 |
 | Directional lights | 1 |
 | Cameras | 1 (the active camera is set, never created) |
-
-**Slot counts** are fixed constants; the values below are provisional until
-pinned by the delivering milestone:
-
-| Slot family | Count | Status |
-|---|---|---|
-| Textures | 8 | provisional — pinned by F2 |
-| Meshes | 8 | provisional — pinned by F3 |
-| Skeletons / animations | 8 each | provisional — pinned by F7 |
 
 ## API catalog
 
@@ -180,8 +190,8 @@ modes, display list (record → playback).
 // F2 · C · provisional
 efx.setClearColor(color)          // [r,g,b,a] clear color for each frame
 efx.setCamera2D(opts)             // { x, y, zoom, rotation? } — the one ortho camera
-efx.drawQuad(x, y, w, h, opts?)   // opts: { color?, textureSlot?, uv? }
-efx.setTexture(slot, data)        // slot 0..TEXTURE_SLOTS-1; data shape pinned by F2
+efx.createTexture(data)           // → Texture; data: { width, height, pixels } (shape pinned by F2)
+efx.drawQuad(x, y, w, h, opts?)   // opts: { color?, texture?, uv? }
 efx.setBlendMode(mode)            // 'alpha' (default) | 'additive' | 'subtractive'
 ```
 
@@ -189,16 +199,19 @@ efx.setBlendMode(mode)            // 'alpha' (default) | 'additive' | 'subtracti
   re-order for state changes — order is not a batching contract.
 - Blending covers additive and subtractive (vision.md); alpha is the default
   mode for ordinary 2D drawing.
+- `Texture` objects carry query methods (`tex.width`, `tex.height`) and
+  `tex.destroy()`; count is unbounded, memory-bounded only (see Resource &
+  memory model).
 
 ```js
 // main.js — F2 sample (provisional API)
-const LOGO = 0;
 let t = 0;
+let logo = null;
 
 function init() {
     efx.setClearColor([0.08, 0.09, 0.12, 1]);
     efx.setCamera2D({ x: 0, y: 0, zoom: 1 });
-    efx.setTexture(LOGO, { width: 64, height: 64, pixels: makeLogoPixels() });
+    logo = efx.createTexture({ width: 64, height: 64, pixels: makeLogoPixels() });
 }
 
 function update(dt) {
@@ -207,7 +220,7 @@ function update(dt) {
 
 function render() {
     efx.setBlendMode('alpha');
-    efx.drawQuad(64, 64, 128, 128, { textureSlot: LOGO });
+    efx.drawQuad(64, 64, 128, 128, { texture: logo });
     efx.setBlendMode('additive');
     efx.drawQuad(224, 96, 64, 64, { color: [1, 0.5, 0, 1] });
 }
@@ -220,10 +233,13 @@ test, vertex colors, procedural primitives.
 
 ```js
 // F3 · C · provisional
-efx.setCamera3D(opts)     // { pos, target, fov } — fov in degrees; the one camera
-efx.setMesh(slot, data)   // slot 0..MESH_SLOTS-1; data: { positions, normals?, uvs?, colors? }
-efx.drawMesh(opts)        // { mesh, transform?, color? } — depth-tested; vertex colors used when present
+efx.setCamera3D(opts)    // { pos, target, fov } — fov in degrees; the one camera
+efx.createMesh(data)     // → Mesh; data: { positions, normals?, uvs?, colors? }
+efx.drawMesh(opts)       // { mesh, transform?, color? } — depth-tested; vertex colors used when present
 ```
+
+- `Mesh` objects carry `mesh.destroy()` (and vertex-count queries); skinned
+  meshes extend the data shape with `joints`/`weights` in F7.
 
 ```js
 // F3 · JS · provisional — pure-JS math helpers, engine-bundled
@@ -236,7 +252,7 @@ efx.quat.*  // quaternion helpers, delivered with F3 math, consumed by F7
 ```
 
 ```js
-// F3 · JS · provisional — procedural primitives producing mesh data for setMesh
+// F3 · JS · provisional — procedural primitives producing mesh data for createMesh
 efx.makeCube(opts?)   // { size }
 efx.makePlane(opts?)  // { size, segments? }
 efx.makeSphere(opts?) // { radius, segments? }
@@ -244,13 +260,13 @@ efx.makeSphere(opts?) // { radius, segments? }
 
 ```js
 // main.js — F3 sample (provisional API)
-const CUBE = 0;
+let cube = null;
 let yaw = 0;
 
 function init() {
     efx.setClearColor([0.08, 0.09, 0.12, 1]);
     efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });
-    efx.setMesh(CUBE, efx.makeCube({ size: 1 }));
+    cube = efx.createMesh(efx.makeCube({ size: 1 }));
 }
 
 function update(dt) {
@@ -259,7 +275,7 @@ function update(dt) {
 
 function render() {
     efx.drawMesh({
-        mesh: CUBE,
+        mesh: cube,
         transform: efx.mat4.rotate(efx.mat4.identity(), yaw, [0, 1, 0]),
         color: [0.9, 0.4, 0.2, 1],
     });
@@ -288,11 +304,11 @@ efx.setMaterial(mat)             // Phong channels:
 ```js
 // F4b · C · provisional — per-channel maps and alpha masks extend the same material object
 // {
-//   ambient:  { color, map: textureSlot },
-//   diffuse:  { color, map: textureSlot },
-//   specular: { color, shininess, map: textureSlot },
-//   emissive: { color, map: textureSlot },
-//   alphaMask: textureSlot,
+//   ambient:  { color, map: tex },      // tex: a Texture object
+//   diffuse:  { color, map: tex },
+//   specular: { color, shininess, map: tex },
+//   emissive: { color, map: tex },
+//   alphaMask: tex,
 // }
 ```
 
@@ -301,12 +317,12 @@ efx.setMaterial(mat)             // Phong channels:
 
 ```js
 // main.js — F4 sample (provisional API)
-const BALL = 0;
+let ball = null;
 
 function init() {
     efx.setClearColor([0.05, 0.05, 0.08, 1]);
     efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });
-    efx.setMesh(BALL, efx.makeSphere({ radius: 1, segments: 24 }));
+    ball = efx.createMesh(efx.makeSphere({ radius: 1, segments: 24 }));
     efx.setLight(0, { pos: [3, 4, 2], color: [1, 0.95, 0.9, 1], range: 20 });
     efx.setDirectionalLight({ dir: [-0.5, -1, -0.3], color: [0.2, 0.25, 0.35, 1] });
     efx.setMaterial({
@@ -318,7 +334,7 @@ function init() {
 }
 
 function render() {
-    efx.drawMesh({ mesh: BALL });
+    efx.drawMesh({ mesh: ball });
 }
 ```
 
@@ -327,12 +343,12 @@ function render() {
 Scope from roadmap F5: RTT, fullscreen-quad passes, color filter, blur.
 
 ```js
-// F5 · C · provisional — render targets are the handle-based family
-efx.createRenderTarget(opts?)     // { width, height } → handle
-efx.destroyRenderTarget(handle)  // explicit release (required)
-efx.beginRenderTarget(handle)    // redirect drawing into the target
-efx.endRenderTarget()            // back to the default target
-efx.drawRenderTarget(handle, x, y, w, h, opts?)  // draw a target as a textured quad
+// F5 · C · provisional — render targets are native-backed classes
+efx.createRenderTarget(opts?)     // { width, height } → RenderTarget
+efx.beginRenderTarget(rt)         // redirect drawing into the target
+efx.endRenderTarget()             // back to the default target
+efx.drawRenderTarget(rt, x, y, w, h, opts?)  // draw a target as a textured quad
+// rt.destroy() releases it — deferred to frame end if the list still holds it
 ```
 
 ```js
@@ -369,9 +385,12 @@ decided here), interactive REPL. Paths are relative to the resource root
 
 ```js
 // F6 · C · provisional — signatures final once the asset format is decided (F6)
-efx.loadText(path)           // → string
-efx.loadImage(path)          // → texture data for efx.setTexture
-efx.loadMesh(path)           // → mesh data for efx.setMesh
+efx.loadText(path)     // → string
+efx.loadImage(path)    // → pixel data for efx.createTexture
+efx.loadMesh(path)     // → Mesh
+
+// F6 · JS · provisional — convenience composition on the public C layer
+efx.loadTexture(path)  // → Texture (createTexture(loadImage(path)))
 ```
 
 - The console/REPL run mode drives this same `efx` namespace interactively;
@@ -379,16 +398,16 @@ efx.loadMesh(path)           // → mesh data for efx.setMesh
 
 ```js
 // main.js — F6 sample (provisional API)
-const MESH = 0;
+let teapot = null;
 
 function init() {
     efx.log(efx.loadText('data/welcome.txt'));
     efx.setCamera3D({ pos: [0, 1, 4], target: [0, 0, 0], fov: 60 });
-    efx.setMesh(MESH, efx.loadMesh('models/teapot.mesh'));
+    teapot = efx.loadMesh('models/teapot.mesh');
 }
 
 function render() {
-    efx.drawMesh({ mesh: MESH });
+    efx.drawMesh({ mesh: teapot });
 }
 ```
 
@@ -399,46 +418,48 @@ import, play/pause/blend.
 
 ```js
 // F7 · C · provisional
-efx.setSkeleton(slot, data)            // slot 0..SKELETON_SLOTS-1 — joints + inverse bind matrices
-efx.setAnimation(slot, data)           // slot 0..ANIMATION_SLOTS-1
-efx.loadSkeleton(path)                 // → skeleton data for setSkeleton
-efx.loadAnimation(path)                // → animation data for setAnimation
-efx.setSkin(skelSlot, meshSlot)        // bind a skeleton to a skinned mesh slot
-efx.playAnimation(skelSlot, opts?)     // { animation, loop?, speed? }
-efx.pauseAnimation(skelSlot)
-efx.blendAnimations(skelSlot, a, b, t) // blend pose of animations a and b at weight t
+efx.createSkeleton(data)             // → Skeleton — joints + inverse bind matrices
+efx.createAnimation(data)            // → Animation
+efx.loadSkeleton(path)               // → Skeleton
+efx.loadAnimation(path)              // → Animation
+efx.setSkin(skel, mesh)              // bind a skeleton to a skinned Mesh
+efx.playAnimation(skel, opts?)       // { animation, loop?, speed? } — Animation object
+efx.pauseAnimation(skel)
+efx.blendAnimations(skel, a, b, t)   // blend the poses of Animations a and b at weight t
 ```
 
-- The skinning pipeline: a **skinned mesh** is ordinary F3 mesh data extended
-  with per-vertex `joints` + `weights` attributes, uploaded in bind pose via
-  `efx.setMesh`. `efx.setSkin` binds it to a skeleton; from then on every
-  frame the CPU computes the posed vertices **in place** and the bound mesh
-  slot always holds the current pose — `efx.drawMesh({ mesh })` renders it.
-- To keep the bind pose, upload the same data to a second mesh slot first;
-  skinning only rewrites the slot given to `setSkin`.
+- The skinning pipeline: a **skinned mesh** is ordinary F3 mesh data
+  extended with per-vertex `joints` + `weights` attributes, uploaded in
+  bind pose via `efx.createMesh`. `efx.setSkin` binds it to a skeleton;
+  from then on every frame the CPU computes the posed vertices **in place**
+  and the bound Mesh always holds the current pose —
+  `efx.drawMesh({ mesh })` renders it. Destroying a bound Mesh or Skeleton
+  unbinds first.
+- To keep the bind pose, create a second Mesh from the same data first;
+  skinning only rewrites the Mesh given to `setSkin`.
 
 ```js
 // main.js — F7 sample (provisional API)
-const SKEL = 0, HERO = 0; // HERO: mesh slot 0, starts as the bind pose
+let hero = null, skel = null, walk = null, run = null;
 let t = 0;
 
 function init() {
     efx.setCamera3D({ pos: [0, 1.5, 4], target: [0, 1, 0], fov: 60 });
-    efx.setMesh(HERO, efx.loadMesh('actors/hero.mesh')); // bind pose + joints/weights
-    efx.setSkeleton(SKEL, efx.loadSkeleton('actors/hero.skel'));
-    efx.setAnimation(0, efx.loadAnimation('actors/hero.walk'));
-    efx.setAnimation(1, efx.loadAnimation('actors/hero.run'));
-    efx.setSkin(SKEL, HERO); // posed vertices are written back into slot 0 each frame
-    efx.playAnimation(SKEL, { animation: 0, loop: true });
+    hero = efx.loadMesh('actors/hero.mesh');          // bind pose + joints/weights
+    skel = efx.loadSkeleton('actors/hero.skel');
+    walk = efx.loadAnimation('actors/hero.walk');
+    run  = efx.loadAnimation('actors/hero.run');
+    efx.setSkin(skel, hero);
+    efx.playAnimation(skel, { animation: walk, loop: true });
 }
 
 function update(dt) {
     t += dt;
-    efx.blendAnimations(SKEL, 0, 1, Math.min(1, t / 2)); // walk → run over 2s
+    efx.blendAnimations(skel, walk, run, Math.min(1, t / 2)); // walk → run over 2s
 }
 
 function render() {
-    efx.drawMesh({ mesh: HERO }); // renders the current CPU-skinned pose
+    efx.drawMesh({ mesh: hero }); // renders the current CPU-skinned pose
 }
 ```
 
@@ -450,22 +471,22 @@ built only on the public `[C]` API above.
 
 ```js
 // F8 · JS · provisional
-efx.loadFont(path)                   // → font for drawText (atlas built on quads)
-efx.drawModel(meshSlot, mat, opts?)  // { transform? } — one-call model drawing
+efx.loadFont(path)                   // → Font for drawText (atlas built on quads); font.destroy()
+efx.drawModel(mesh, mat, opts?)      // { transform? } — one-call model drawing
                                      // over setMaterial + drawMesh
 efx.drawText(text, x, y, opts?)      // { font, size?, color? } — text as quads
 ```
 
 ```js
 // main.js — F8 sample (provisional API)
-const MESH = 0;
+let teapot = null;
 let yaw = 0;
 let font = null;
 
 function init() {
     efx.setClearColor([0.08, 0.09, 0.12, 1]);
     efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });
-    efx.setMesh(MESH, efx.loadMesh('models/teapot.mesh'));
+    teapot = efx.loadMesh('models/teapot.mesh');
     font = efx.loadFont('fonts/perfect.ttf');
 }
 
@@ -474,7 +495,7 @@ function update(dt) {
 }
 
 function render() {
-    efx.drawModel(MESH, {
+    efx.drawModel(teapot, {
         diffuse:  { color: [0.8, 0.3, 0.2, 1] },
         specular: { color: [1, 1, 1, 1], shininess: 32 },
     }, { transform: efx.mat4.rotate(efx.mat4.identity(), yaw, [0, 1, 0]) });
@@ -492,7 +513,7 @@ section (or an open question below):
 | 2D drawing via quads | F2 |
 | Additive and subtractive blending modes | F2 (`setBlendMode`) |
 | 1 camera fixed | F2 `setCamera2D`, F3 `setCamera3D`, limits table |
-| Rendering meshes | F3 (`setMesh` / `drawMesh`) |
+| Rendering meshes | F3 (`createMesh` / `drawMesh`) |
 | Vertex colours | F3 (mesh `colors?` attribute, `drawMesh` color) |
 | Matrix math | F3 (`efx.mat4` / `efx.vec3` / `efx.quat`) |
 | Procedural primitives | F3 (`makeCube` / `makePlane` / `makeSphere`) |
@@ -508,7 +529,7 @@ section (or an open question below):
 | Callbacks for update and rendering | Lifecycle hooks (`init` extends this contract) |
 | Low/mid C + high-level JS layering | Overview (two layers), every entry tag |
 | No browser/Node dependencies (incl. transitively) | Conventions (Dependencies) |
-| Handles or pre-allocated slots for unmanaged resources | Resource & memory model |
+| Handles (resource objects) or pre-allocated slots for unmanaged resources | Resource & memory model |
 | Fixed-function pipeline (no programmable shaders) | Engine-internal constraint — shapes what the API can express; no API entry |
 | Immediate-mode API with re-orderable display list | Overview (immediate mode, deferred rendering) |
 | Single-binary player for resource folders | Player runtime, not this API — see `openspec/specs` (`player-runtime`) |
@@ -522,8 +543,6 @@ API for them:
   cataloged. If vision grows this capability, it enters through a future
   change with a `js-api` delta.
 - **Audio** — absent from vision.md. Same treatment as input.
-- **Texture/mesh/skeleton slot counts** — provisional (8 / 8 / 8 each) until
-  pinned by F2 / F3 / F7 respectively.
 - **Asset format** — decided in F6; until then `load*` signatures stay
   provisional.
 - **`update(dt)` argument** — target contract; ratified by F2 (see Lifecycle
