@@ -4,7 +4,9 @@ schema: spec-driven
 # This is shown to AI when creating artifacts.
 context: |
   Tech stack: C11 core (ADR 0001) rendering via Sokol — fixed-function
-  only, no programmable shaders, ever; quickjs-ng embedded as the ES6
+  consumer API, no script-visible shaders ever (internals use Sokol's
+  programmable pipeline with engine-owned canned shaders, ADR 0015);
+  quickjs-ng embedded as the ES6
   runtime (ADR 0002, no quickjs-libc); Emscripten bridge for the browser.
   CMake build for Windows/Linux/macOS/Emscripten; output is a single
   `efx` player binary for a resource root with a `main.js` entry. GitHub

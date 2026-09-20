@@ -29,8 +29,10 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
 
 ## Stack
 
-- C11 core (ADR 0001); rendering via **Sokol** — fixed-function only,
-  no programmable shaders, ever; **quickjs-ng** embedded as the ES6
+- C11 core (ADR 0001); rendering via **Sokol** — fixed-function consumer
+  API, no script-visible shaders ever (internals use Sokol's programmable
+  pipeline with engine-owned canned shaders, ADR 0015);
+  **quickjs-ng** embedded as the ES6
   runtime (ADR 0002); Emscripten bridge for the browser.
 - Build system is CMake; targets: Windows, Linux, macOS, Emscripten;
   output is a single binary "player" for a resource folder/zip with a
@@ -64,7 +66,9 @@ see `docs/decisions/`.
 
 ## Non-negotiable design constraints (easy to get wrong)
 
-- **Fixed-function pipeline only** — no programmable shaders, ever.
+- **Fixed-function pipeline only** — no shader-shaped features on the
+  consumer API, ever; the internal renderer uses Sokol's programmable
+  pipeline with engine-owned canned shaders (ADR 0015).
 - Fixed limits: 4 point lights + 1 directional light, 1 camera.
 - Immediate-mode *API*, but rendering goes through a re-orderable display list
   — do not map API calls 1:1 to draw calls.

@@ -6,7 +6,7 @@ I want to create an old-school 3d game engine that is capable of producing ps2-e
 Here are some properties I want in unspecified order:
 
 
-- Fixed function pipeline - no programmable shaders
+- Fixed function pipeline - no programmable shaders on the consumer-facing API (scripts never see or modify shaders; the internal renderer uses the platform's programmable pipeline as state-of-the-art APIs require — see ADR 0015)
 - 4 point lights, 1 directional light fixed
 - 1 camera fixed
 - Support for rendering to textures

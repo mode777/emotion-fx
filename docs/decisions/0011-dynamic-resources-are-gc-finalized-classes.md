@@ -20,11 +20,12 @@ object, and `JS_FreeRuntime` finalizes everything at shutdown — the vendored
 
 Resources are classified by count, and the JS shape follows the count:
 
-- **Dynamic-count resources — textures, meshes, render targets, skeletons,
-  animations, fonts — are opaque GC-finalized JS class instances** wrapping
-  the native handle: real query methods (`tex.width`), type-checked
-  arguments via `JS_GetOpaque2`, and an explicit `destroy()` as the
-  deterministic release path. `create*`/`load*` calls return them.
+- **Dynamic-count resources are opaque GC-finalized JS class instances**
+  wrapping the native handle: type-checked arguments via `JS_GetOpaque2`
+  and an explicit `destroy()` as the deterministic release path.
+  `create*`/`load*` calls return them. (The definitive type list and the
+  fully-opaque starting point — `destroy()` only at first — live in
+  ADR 0013.)
 - **The finalizer is a backstop, not the primary path**: `destroy()` is
   idempotent; using a destroyed resource throws; anything still alive at
   runtime teardown is finalized — a script cannot leak past process exit.

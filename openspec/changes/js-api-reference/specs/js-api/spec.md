@@ -48,18 +48,21 @@ reference SHALL be tagged with its layer.
 Every engine resource type that scripts can create or reference SHALL be
 classified in the reference as exactly one of: JS-managed (plain script
 objects, garbage collected), native-backed class (an opaque JS object
-wrapping a native handle, with query methods and an explicit `destroy()`
-release method), or slot-based (a fixed pre-allocated bank of indexed
-resources). Every resource requiring native storage MUST be a native-backed
-class — released deterministically by its `destroy()`, reclaimed by its GC
-finalizer if the script never calls it, and finalized at runtime teardown —
-unless its count is fixed by design, in which case it is slot-based. The
-runtime MUST factor native allocation sizes into GC pressure and MUST run
-collection at frame end, bounding unreferenced native waste to roughly one
-frame. Resources recorded into the display list MUST stay alive until
-playback completes. The reference SHALL document the engine's fixed limits:
-4 point lights, 1 directional light, and 1 camera; lights are the only slot
-bank.
+wrapping a native handle with an explicit `destroy()` release method —
+fully opaque at first; query methods, getters, and setters are reserved for
+later), or slot-based (a fixed pre-allocated bank of indexed resources).
+The native-backed classes SHALL be exactly: MeshData, ImageData, Skeleton,
+Animation, Mesh, Texture, and RenderTarget; extending this list
+requires a `js-api` delta. Every resource requiring native storage MUST be
+a native-backed class — released deterministically by its `destroy()`,
+reclaimed by its GC finalizer if the script never calls it, and finalized
+at runtime teardown — unless its count is fixed by design, in which case it
+is slot-based. The runtime MUST factor native allocation sizes (CPU and GPU)
+into GC pressure and MUST run collection at frame end, bounding
+unreferenced native waste to roughly one frame. Resources recorded into the
+display list MUST stay alive until playback completes. The reference SHALL
+document the engine's fixed limits: 4 point lights, 1 directional light,
+and 1 camera; lights are the only slot bank.
 
 #### Scenario: Fixed limits stated
 - **WHEN** the reference document's limits section is read

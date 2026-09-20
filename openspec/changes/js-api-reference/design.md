@@ -91,24 +91,33 @@ and easy to ignore in game scripts.
 
 ### D6: Resource model — classes for dynamic counts, slots for the light bank
 - **JS-managed:** materials (plain objects read by `efx.setMaterial`),
-  mesh/vertex data before upload, colors, transforms — created and dropped
-  freely, GC handles lifetime.
-- **Native-backed classes** (textures, meshes, render targets, skeletons,
-  animations, fonts): opaque GC-finalized JS objects wrapping native
-  handles — query methods (`tex.width`), idempotent `destroy()` as the
-  deterministic release path, finalizer as backstop, finalization at
-  shutdown. `create*`/`load*` calls return them. Native byte cost counts
-  toward GC pressure and the player collects at frame end, so unreferenced
-  resources are reclaimed within roughly a frame even without `destroy()`
-  (ADR 0012). The display list pins recorded objects; `destroy()` mid-frame
-  defers the native release to frame end.
+  colors, transforms, and the F8 font object (atlas Texture + quad layout,
+  pure JS) — created and dropped freely, GC handles lifetime.
+- **Native-backed classes** — the seven-type taxonomy of ADR 0014
+  (supersedes 0013): MeshData (skinned meshes carry `joints`/`weights`
+  vertex attributes, glTF-style), ImageData, Skeleton (joint hierarchy +
+  inverse bind matrices ≈ glTF `skin`), Animation (CPU-side) and Mesh,
+  Texture, RenderTarget (GPU). Opaque GC-finalized JS objects wrapping
+  native handles — **fully opaque at first (`destroy()` only); query
+  methods, getters, and setters are reserved for later** (the class
+  machinery supports adding them without changing call sites). Pipeline:
+  `createMesh(meshData)` / `createTexture(imageData)` upload CPU → GPU;
+  `setSkin(skel, mesh)` is the `node.mesh + node.skin` equivalent, posing
+  in place (CPU skinning chosen on engineering grounds — ADR 0014, with
+  the constraint clarified in ADR 0015).
+  Native byte cost — CPU buffers included — counts toward GC pressure and
+  the player collects at frame end, so unreferenced resources are reclaimed
+  within roughly a frame even without `destroy()` (ADR 0012). The display
+  list pins recorded objects; `destroy()` mid-frame defers the native
+  release to frame end.
 - **Slot-based:** the light bank only — 4 point slots + 1 directional
   (fixed limits from vision.md). The earlier texture/mesh/skeleton slot
   banks and their slot-count tables are dropped: those counts were
   provisional constants solving an allocation problem that classes remove.
 - Fixed limits table: 4 point lights, 1 directional light, 1 camera.
-Rationale, consequences, and rejected alternatives: ADR 0011 (model) and
-ADR 0012 (memory discipline).
+Rationale, consequences, and rejected alternatives: ADR 0011 (model),
+ADR 0012 (memory discipline), ADR 0014 (taxonomy + skinning; supersedes
+0013).
 
 ### D7: High-level JS layer ships inside the player
 Pure-JS high-level functions (`efx.drawModel`, `efx.drawText`, procedural
