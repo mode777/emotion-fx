@@ -67,13 +67,15 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     ID3D11Device *dev = (ID3D11Device *)env.d3d11.device;
     ID3D11DeviceContext *ctx = (ID3D11DeviceContext *)env.d3d11.device_context;
     IDXGISwapChain *sc = (IDXGISwapChain *)sapp_d3d11_get_swap_chain();
+    fprintf(stderr, "capture: dev=%p ctx=%p sc=%p\n", (void *)dev, (void *)ctx, (void *)sc);
+    fflush(stderr);
     if (!dev || !ctx || !sc) {
         return -1;
     }
     ID3D11Texture2D *back = NULL;
     HRESULT hr = sc->lpVtbl->GetBuffer(sc, 0, &IID_ID3D11Texture2D, (void **)&back);
     if (FAILED(hr)) {
-        fprintf(stderr, "capture: GetBuffer failed hr=0x%08lx\n", (unsigned long)hr);
+        fprintf(stderr, "capture: GetBuffer failed hr=0x%08lx\n", (unsigned long)hr); fflush(stderr);
         return -1;
     }
     D3D11_TEXTURE2D_DESC bd;
@@ -88,14 +90,14 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     sd.SampleDesc.Quality = 0;
     ID3D11Texture2D *staging = NULL;
     if (FAILED(dev->lpVtbl->CreateTexture2D(dev, &sd, NULL, &staging))) {
-        fprintf(stderr, "capture: CreateTexture2D staging failed\n");
+        fprintf(stderr, "capture: CreateTexture2D staging failed\n"); fflush(stderr);
         back->lpVtbl->Release(back);
         return -1;
     }
     ctx->lpVtbl->CopyResource(ctx, (ID3D11Resource *)staging, (ID3D11Resource *)back);
     D3D11_MAPPED_SUBRESOURCE map;
     if (FAILED(ctx->lpVtbl->Map(ctx, (ID3D11Resource *)staging, 0, D3D11_MAP_READ, 0, &map))) {
-        fprintf(stderr, "capture: Map failed\n");
+        fprintf(stderr, "capture: Map failed\n"); fflush(stderr);
         staging->lpVtbl->Release(staging);
         back->lpVtbl->Release(back);
         return -1;
