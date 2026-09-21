@@ -165,10 +165,12 @@ static void efx_frame_cb(void) {
         if (efx_capture_read_rgba(&px, &w, &h) == 0) {
             if (efx_capture_write_png(g_capture.output, w, h, px) != 0) {
                 fprintf(stderr, "player: capture PNG write failed: %s\n", g_capture.output);
+                fflush(stderr);
             }
             free(px);
         } else {
             fprintf(stderr, "player: capture readback failed\n");
+            fflush(stderr);
         }
         sapp_quit();
     }
