@@ -92,19 +92,12 @@ page.on('pageerror', (e) => console.error('[pageerror]', e.message));
 let failures = 0;
 for (const scene of scenes) {
     process.stdout.write(`golden_web/${scene}: `);
-    await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:${PORT}/?scene=${scene}`, { waitUntil: 'load' });
     const b64 = await page.evaluate(async (name) => {
         const M = window.Module;
-        if (typeof M.callMain !== 'function' || typeof M.FS?.readFile !== 'function') {
-            throw new Error('runtime hooks missing: callMain=' + typeof M.callMain +
-                ' FS=' + typeof M.FS + ' keys=' + Object.keys(M).slice(0, 40).join(','));
+        if (typeof M.FS?.readFile !== 'function') {
+            throw new Error('FS missing');
         }
-        M.canvas = document.getElementById('canvas');
-        M.callMain([
-            '--capture-frame', '2',
-            '--capture-output', `/captures/${name}.png`,
-            `/goldens/${name}`,
-        ]);
         for (let i = 0; i < 600; i++) {
             try {
                 const bytes = M.FS.readFile(`/captures/${name}.png`);
@@ -116,8 +109,7 @@ for (const scene of scenes) {
             }
         }
         console.log('[diag] raf ticks:', window.__rafCount,
-            'canvas:', !!document.getElementById('canvas'),
-            'webgl:', !!document.createElement('canvas').getContext('webgl2'));
+            'webgl2:', !!document.createElement('canvas').getContext('webgl2'));
         return null;
     }, scene);
 
