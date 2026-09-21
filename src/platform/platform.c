@@ -98,9 +98,11 @@ static void efx_init_cb(void) {
 
 static void efx_frame_cb(void) {
     g_frame++;
+    fprintf(stderr, "efx: frame %d\n", g_frame);
     efx_render_begin_frame();
     efx_render_set_viewport(sapp_width(), sapp_height());
     if (g_hooks.on_frame && g_hooks.on_frame(g_hooks.ud)) {
+        fprintf(stderr, "efx: on_frame stop\n");
         sapp_quit();
         return;
     }
@@ -162,6 +164,7 @@ static void efx_frame_cb(void) {
         } else {
             fprintf(stderr, "player: capture readback failed\n");
         }
+        fprintf(stderr, "efx: capture done %d\n", g_frame);
         sapp_quit();
     }
 }
