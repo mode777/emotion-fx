@@ -166,6 +166,10 @@ static void efx_frame_cb(void) {
                     gli.readPixels(320, 240, 1, 1, gli.RGBA, gli.UNSIGNED_BYTE, pxs);
                     console.log('[gl-probe] sokol-content px=' + pxs.join(','));
                 }
+                console.log('[gl-state] fbo=' + gli.getParameter(gli.FRAMEBUFFER_BINDING) +
+                    ' program=' + gli.getParameter(gli.CURRENT_PROGRAM) +
+                    ' viewport=' + gli.getParameter(gli.VIEWPORT).join(',') +
+                    ' blend=' + gli.isEnabled(gli.BLEND));
                 gli.clearColor(1, 0, 0, 1);
                 gli.clear(gli.COLOR_BUFFER_BIT);
                 const url = c.toDataURL('image/png');
