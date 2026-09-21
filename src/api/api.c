@@ -604,6 +604,13 @@ JSValue efx_js_drawQuad(JSContext *ctx, JSValueConst this_val, int argc, JSValue
 
     int rc = efx_render_quad((float)x, (float)y, (float)w, (float)h,
                              tex->handle, color, rotation, scale, src, has_src);
+#if defined(__EMSCRIPTEN__)
+    {
+        int n = 0;
+        efx_render_records(&n);
+        fprintf(stderr, "efx: quad rc=%d count=%d\n", rc, n);
+    }
+#endif
     if (rc == EFX_RENDER_ERR_BUDGET) {
         return range_error(ctx, "display list budget exceeded");
     }
