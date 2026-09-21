@@ -84,6 +84,10 @@ for (const scene of scenes) {
     await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
     const b64 = await page.evaluate(async (name) => {
         const M = window.Module;
+        if (typeof M.callMain !== 'function' || typeof M.FS?.readFile !== 'function') {
+            throw new Error('runtime hooks missing: callMain=' + typeof M.callMain +
+                ' FS=' + typeof M.FS + ' keys=' + Object.keys(M).slice(0, 40).join(','));
+        }
         M.canvas = document.getElementById('canvas');
         M.callMain([
             '--capture-frame', '2',

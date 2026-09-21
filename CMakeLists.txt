@@ -82,6 +82,7 @@ if(EMSCRIPTEN)
         target_link_options(player_web_golden PRIVATE
             -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2
             -sENVIRONMENT=web
+            -sINVOKE_RUN=0
             "--post-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web_golden_post.js"
             "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens@/goldens")
     endif()

@@ -64,14 +64,15 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
 int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     int w = sapp_width();
     int h = sapp_height();
-    ID3D11Device *dev = (ID3D11Device *)sapp_d3d11_get_device();
-    ID3D11DeviceContext *ctx = (ID3D11DeviceContext *)sapp_d3d11_get_device_context();
+    sapp_environment env = sapp_get_environment();
+    ID3D11Device *dev = (ID3D11Device *)env.d3d11.device;
+    ID3D11DeviceContext *ctx = (ID3D11DeviceContext *)env.d3d11.device_context;
     IDXGISwapChain *sc = (IDXGISwapChain *)sapp_d3d11_get_swap_chain();
     if (!dev || !ctx || !sc) {
         return -1;
     }
     ID3D11Texture2D *back = NULL;
-    if (FAILED(sc->lpVtbl->GetBuffer(sc, 0, &IID_ID3D11Texture2D, (void **)&back))) {
+    if (FAILED(sc->lpVtbl->GetBuffer(sc, 0, __uuidof(ID3D11Texture2D), (void **)&back))) {
         return -1;
     }
     D3D11_TEXTURE2D_DESC bd;
