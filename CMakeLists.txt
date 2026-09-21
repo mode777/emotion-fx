@@ -87,7 +87,6 @@ if(EMSCRIPTEN)
         set_target_properties(player_web_golden PROPERTIES SUFFIX ".js")
         target_link_options(player_web_golden PRIVATE
             -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2 -sSTACK_SIZE=4MB
-            -sASSERTIONS=2 -sSTACK_OVERFLOW_CHECK=2 -g2
             -sENVIRONMENT=web
             "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens@/goldens")
     endif()
