@@ -242,7 +242,10 @@ JSValue efx_js_setClearColor(JSContext *ctx, JSValueConst this_val, int argc, JS
     if (rc != 0) {
         return JS_EXCEPTION;
     }
+    fprintf(stderr, "efx: binding clear %.2f %.2f %.2f %.2f\n", c[0], c[1], c[2], c[3]);
     efx_render_set_clear_color(c);
+    efx_render_clear_color(c);
+    fprintf(stderr, "efx: state clear %.2f %.2f %.2f %.2f\n", c[0], c[1], c[2], c[3]);
     return JS_UNDEFINED;
 }
 

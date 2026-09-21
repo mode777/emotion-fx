@@ -220,6 +220,22 @@ static int blend_snapshot(void) {
     return 0;
 }
 
+/* setClearColor stores through the JS binding */
+static int clear_color_js(void) {
+    if (ok_js("efx.setClearColor([0.1, 0.7, 0.3, 1]);")) {
+        end_js();
+        return fail("snippet");
+    }
+    float c[4];
+    efx_render_clear_color(c);
+    if (!feq(c[0], 0.1f) || !feq(c[1], 0.7f) || !feq(c[2], 0.3f) || !feq(c[3], 1.0f)) {
+        end_js();
+        return fail("clear color not stored");
+    }
+    end_js();
+    return 0;
+}
+
 /* default camera: frame == viewport, identity view */
 static int default_camera(void) {
     if (ok_js("efx.drawQuad(0, 0, 4, 4, efx.whiteTexture);")) {
@@ -250,6 +266,7 @@ int main(int argc, char **argv) {
     if (!strcmp(c, "texture_lifecycle")) return texture_lifecycle();
     if (!strcmp(c, "blend_snapshot")) return blend_snapshot();
     if (!strcmp(c, "default_camera")) return default_camera();
+    if (!strcmp(c, "clear_color_js")) return clear_color_js();
     fprintf(stderr, "unknown case: %s\n", c);
     return 2;
 }
