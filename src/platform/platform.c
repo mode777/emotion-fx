@@ -11,50 +11,184 @@
 #define SOKOL_GLCORE
 #endif
 
+#include <stdio.h>
 #include <string.h>
 
 #include "platform/platform.h"
+#include "platform/pipeline.h"
+#include "platform/capture.h"
+#include "render/render.h"
 
 #include "sokol_app.h"
 #include "sokol_gfx.h"
 #include "sokol_glue.h"
 
+/* fixed virtual frame for golden captures (design D7/D9) */
+#define EFX_CAP_W 640
+#define EFX_CAP_H 480
+
 static efx_frame_hooks g_hooks;
-static sg_pass_action g_pass_action;
+static efx_platform_capture g_capture;
+static int g_frame;
+
+#ifdef SOKOL_METAL
+/* capture pass renders into an injected Managed texture instead of the
+   framebuffer-only swapchain drawable */
+static sg_image g_cap_img;
+static sg_attachments g_cap_atts;
+static void *g_cap_mtl;
+static int g_cap_active;
+#endif
+
+static sg_pass_action efx_pass_action(void) {
+    sg_pass_action pa;
+    memset(&pa, 0, sizeof(pa));
+    float c[4];
+    efx_render_clear_color(c);
+    pa.colors[0].load_action = SG_LOADACTION_CLEAR;
+    pa.colors[0].clear_value = (sg_color){c[0], c[1], c[2], c[3]};
+    return pa;
+}
+
+#ifdef SOKOL_METAL
+static void efx_capture_setup(void) {
+    const void *dev = sapp_metal_get_device();
+    if (!dev) {
+        return;
+    }
+    id<MTLDevice> mtl = (__bridge id<MTLDevice>)dev;
+    MTLTextureDescriptor *td = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                     width:EFX_CAP_W height:EFX_CAP_H
+                                 mipmapped:NO];
+    td.usage = MTLTextureUsageRenderTarget;
+    td.storageMode = MTLStorageModeManaged;
+    id<MTLTexture> tex = [mtl newTextureWithDescriptor:td];
+    if (!tex) {
+        return;
+    }
+    g_cap_mtl = (__bridge_retained void *)tex;
+    efx_capture_metal_set_texture(g_cap_mtl);
+    g_cap_img = sg_make_image(&(sg_image_desc){
+        .width = EFX_CAP_W,
+        .height = EFX_CAP_H,
+        .pixel_format = SG_PIXELFORMAT_RGBA8,
+        .usage.color_attachment = true,
+        .mtl_textures[0] = g_cap_mtl,
+    });
+    g_cap_atts = sg_make_attachments(&(sg_attachments_desc){
+        .colors[0] = {.color_attachment.image = g_cap_img},
+    });
+    g_cap_active = 1;
+}
+#endif
 
 static void efx_init_cb(void) {
     sg_setup(&(sg_desc){0});
+    efx_pipeline_install();
+#ifdef SOKOL_METAL
+    if (g_capture.frame > 0) {
+        efx_capture_setup();
+    }
+#endif
 }
 
 static void efx_frame_cb(void) {
+    g_frame++;
+    efx_render_begin_frame();
+    efx_render_set_viewport(sapp_width(), sapp_height());
     if (g_hooks.on_frame && g_hooks.on_frame(g_hooks.ud)) {
         sapp_quit();
+        return;
     }
+
+#ifdef SOKOL_METAL
+    int use_capture_pass = g_cap_active && g_frame == g_capture.frame;
+#endif
+
+#ifdef SOKOL_METAL
+    if (use_capture_pass) {
+        sg_begin_pass(&(sg_pass){
+            .action = efx_pass_action(),
+            .attachments = g_cap_atts,
+        });
+        efx_pipeline_play();
+        sg_end_pass();
+    } else {
+        sg_begin_pass(&(sg_pass){
+            .action = efx_pass_action(),
+            .swapchain = sglue_swapchain(),
+        });
+        efx_pipeline_play();
+        sg_end_pass();
+    }
+#else
     sg_begin_pass(&(sg_pass){
-        .action = g_pass_action,
+        .action = efx_pass_action(),
         .swapchain = sglue_swapchain(),
     });
+    efx_pipeline_play();
     sg_end_pass();
+#endif
     sg_commit();
+    efx_render_end_frame();
+
+    if (g_capture.frame > 0 && g_frame >= g_capture.frame) {
+        uint8_t *px = NULL;
+        int w = 0, h = 0;
+        if (efx_capture_read_rgba(&px, &w, &h) == 0) {
+            efx_capture_write_png(g_capture.output, w, h, px);
+            free(px);
+        } else {
+            fprintf(stderr, "player: capture readback failed\n");
+        }
+        sapp_quit();
+    }
 }
 
 static void efx_cleanup_cb(void) {
-    sg_shutdown();
+#ifdef SOKOL_METAL
+    if (g_cap_mtl) {
+        id<MTLTexture> tex = (__bridge id<MTLTexture>)g_cap_mtl;
+        [tex release];
+        g_cap_mtl = NULL;
+    }
+#endif
+    /* sg_shutdown is deferred to efx_platform_shutdown() so callers can
+       release their GPU resources first */
 }
 
-int efx_platform_run(efx_frame_hooks hooks) {
+int efx_platform_run(const efx_platform_desc *desc, efx_frame_hooks hooks) {
     g_hooks = hooks;
-    memset(&g_pass_action, 0, sizeof(g_pass_action));
-    g_pass_action.colors[0].load_action = SG_LOADACTION_CLEAR;
-    g_pass_action.colors[0].clear_value = (sg_color){0.13f, 0.15f, 0.20f, 1.0f};
-    sapp_desc desc;
-    memset(&desc, 0, sizeof(desc));
-    desc.init_cb = efx_init_cb;
-    desc.frame_cb = efx_frame_cb;
-    desc.cleanup_cb = efx_cleanup_cb;
-    desc.width = 1024;
-    desc.height = 600;
-    desc.window_title = "EmotionFX";
-    sapp_run(&desc);
+    memset(&g_capture, 0, sizeof(g_capture));
+    if (desc) {
+        g_capture = desc->capture;
+    }
+    g_frame = 0;
+    sapp_desc d;
+    memset(&d, 0, sizeof(d));
+    d.init_cb = efx_init_cb;
+    d.frame_cb = efx_frame_cb;
+    d.cleanup_cb = efx_cleanup_cb;
+    d.width = (desc && desc->width > 0) ? desc->width : 1024;
+    d.height = (desc && desc->height > 0) ? desc->height : 600;
+    if (g_capture.frame > 0) {
+        d.width = EFX_CAP_W;
+        d.height = EFX_CAP_H;
+    }
+    d.window_title = "EmotionFX";
+    sapp_run(&d);
     return 0;
+}
+
+void efx_platform_shutdown(void) {
+    efx_pipeline_shutdown();
+#ifdef SOKOL_METAL
+    if (g_cap_active) {
+        sg_destroy_attachments(g_cap_atts);
+        sg_destroy_image(g_cap_img);
+        g_cap_active = 0;
+    }
+#endif
+    sg_shutdown();
 }

@@ -45,8 +45,8 @@ Every rule below traces to vision.md or to F1's implemented behavior.
   `res.destroy()` releases deterministically, GC is the backstop, and
   methods/getters/setters are reserved for later.
 - **Parameters**: hot immediate-mode calls take scalar arguments first
-  (`drawQuad(x, y, w, h, opts?)`); configuration beyond ~3 values goes in a
-  trailing option object. Optionality is explicit at two levels:
+  (`drawQuad(x, y, w, h, texture, opts?)`); configuration beyond ~3 values
+  goes in a trailing option object. Optionality is explicit at two levels:
   - a `?` on the bag itself (`opts?`) means the whole object may be
     omitted — every field then takes its documented default;
   - a `?` on a field (`range?`) means that field may be omitted — fields
@@ -117,7 +117,7 @@ payload + `skinned` flag: ADR 0017, all under `docs/decisions/`).
 | MeshData | Attributes + indices; skinned meshes add `joints`/`weights` vertex attributes (glTF-style) | Native class | CPU | F3 | `createMeshData` / `loadMeshData` (F6) |
 | ImageData | Raw pixels + size + format | Native class | CPU | F2 | `createImageData` / `loadImage` (F6) |
 | Mesh | GPU mesh; skinned meshes carry skin, skeleton, and clips internally (ADR 0017) | Native class | GPU | F3 | `createMesh(meshData)` / `loadMesh`; `mesh.destroy()` |
-| Texture | GPU texture | Native class | GPU | F2 | `createTexture(imageData)`; `tex.destroy()` |
+| Texture | GPU texture | Native class | GPU | F2 | `createTexture(imageData)`; `tex.destroy()`; `efx.whiteTexture` is an engine-owned instance (destroy throws) |
 | RenderTarget | GPU render target | Native class | GPU | F5 | `createRenderTarget`; `rt.destroy()` |
 | Materials (Phong parameter objects) | — | JS-managed | — | F4 | Passed to `efx.setMaterial` |
 | Fonts (atlas + quad layout) | — | JS-managed | — | F8 | Pure JS over Texture; passed to `drawText` |
@@ -201,40 +201,88 @@ function update() {
 function render() {}
 ```
 
-### F2 — 2D drawing (provisional)
+### F2 — 2D drawing (current)
 
 Scope from roadmap F2: `drawQuad`, ortho camera, texture slots, blending
-modes, display list (record → playback).
+modes, display list (record → playback); golden-image harness first-class
+(ADR 0020).
+
+All 2D drawing happens inside a **virtual pixel frame** established by the
+one camera. Coordinates are frame pixels, origin at the **top-left**,
+y pointing **down**, angles in degrees measured clockwise.
 
 ```js
-// F2 · C · provisional
-efx.setClearColor(color)          // [r,g,b,a] clear color for each frame
-efx.setCamera2D(opts)             // { x, y, zoom, rotation? } — the one ortho camera
-efx.createImageData(opts)         // → ImageData; opts: { width, height, pixels, format? } (shape pinned by F2)
+// F2 · C · current
+efx.setClearColor(color)          // [r,g,b,a]; frame clear color (default black)
+efx.setCamera2D(opts)             // { frame?, x?, y?, zoom?, rotation? }
+efx.createImageData(opts)         // → ImageData; { width, height, pixels, format? = 'rgba8' }
 efx.createTexture(imageData)      // → Texture; uploads CPU → GPU
-efx.drawQuad(x, y, w, h, opts?)   // opts: { color?, texture?, uv? }
+efx.drawQuad(x, y, w, h, texture, opts?)  // required texture; opts below
 efx.setBlendMode(mode)            // 'alpha' (default) | 'additive' | 'subtractive'
+efx.whiteTexture                  // engine-owned 1×1 white Texture (read-only)
 ```
 
-- Quads are recorded into the display list in call order; the renderer may
-  re-order for state changes — order is not a batching contract.
-- Blending covers additive and subtractive (vision.md); alpha is the default
-  mode for ordinary 2D drawing.
-- All resource types are fully opaque for now (`destroy()` only); count is
-  unbounded, memory-bounded only (see Resource & memory model).
+**Camera / projection frame** — `setCamera2D({ frame, x, y, zoom,
+rotation })`:
+
+- `frame: [width, height]` sets the virtual resolution; every draw
+  coordinate is in frame pixels. The frame maps onto the whole window with
+  a **stretch** policy (no letterboxing). Omitted → frame equals the
+  current window size.
+- `x`, `y` name the world point displayed at the **frame center**;
+  default: the frame center itself.
+- `zoom` (default 1, > 0) and `rotation` (default 0) transform around the
+  frame center: zoom 2 shows exactly half the frame's world extent, still
+  centered on `x`/`y`.
+- Never calling `setCamera2D` gives the default camera: frame = current
+  window size, view centered, zoom 1 — pixel coordinates match window
+  pixels.
+- Camera state applies to draws recorded **after** the call; recorded
+  draws never observe later changes (same for blend mode — ADR 0019).
+
+**`drawQuad(x, y, w, h, texture, opts?)`** — records one quad:
+
+- `x`, `y` place the quad's **top-left corner** in frame pixels; `w`, `h`
+  size it in frame pixels (both > 0).
+- `texture` is **required** — a live Texture. Solid-color rectangles use
+  `efx.whiteTexture` with a tint; `efx.whiteTexture` is engine-owned,
+  `destroy()` on it throws `TypeError`.
+- `opts.color` — tint `[r,g,b,a]`, default opaque white.
+- `opts.rotation` — degrees clockwise, default 0; **pivots on the quad
+  center**.
+- `opts.scale` — uniform factor, default 1 (> 0); pivots on the quad
+  center.
+- `opts.sourceRect` — `{ x, y, w, h }` region of the texture in **texture
+  pixels**; default: the full texture. Out-of-bounds rects throw
+  `RangeError`.
+- Unknown option fields throw `TypeError` (typo protection).
+
+**Resources** — `createImageData({ width, height, pixels, format? })`
+builds CPU pixels: `pixels` is a flat array or typed array of RGBA8 bytes,
+length exactly `width × height × 4` (else `RangeError`); `format` is
+`'rgba8'` (the only format in F2). `createTexture(imageData)` uploads to a
+GPU Texture — both are opaque native-backed classes: `destroy()` releases
+deterministically, is idempotent, and using a destroyed resource throws.
+
+**Display list** — draw calls record into a per-frame list played back
+after the render hook returns; there is no flush and no script-visible
+inspection. Playback preserves record order (F2 never reorders — ADR
+0019/D3); overlapping draws keep painter's order. A per-frame record
+budget (~170k quads) is enforced; exceeding it throws `RangeError`.
 
 ```js
-// main.js — F2 sample (provisional API)
+// main.js — F2 sample
 const logo = efx.createTexture(
     efx.createImageData({ width: 64, height: 64, pixels: makeLogoPixels() }));
 efx.setClearColor([0.08, 0.09, 0.12, 1]);
-efx.setCamera2D({ x: 0, y: 0, zoom: 1 });
+efx.setCamera2D({ frame: [640, 480] }); // virtual 640×480 frame, view centered
 
-efx.registerRenderHook(() => {
+efx.registerRenderHook(() => { // or global render() sugar
     efx.setBlendMode('alpha');
-    efx.drawQuad(64, 64, 128, 128, { texture: logo });
+    efx.drawQuad(64, 64, 128, 128, logo); // textured sprite
     efx.setBlendMode('additive');
-    efx.drawQuad(224, 96, 64, 64, { color: [1, 0.5, 0, 1] });
+    efx.drawQuad(224, 96, 64, 64, efx.whiteTexture, { color: [1, 0.5, 0, 1] });
+    efx.setBlendMode('alpha');
 });
 ```
 
@@ -363,14 +411,14 @@ efx.setBlur(opts)         // { radius } — null disables
 
 ```js
 // main.js — F5 sample (provisional API)
-efx.setCamera2D({ x: 0, y: 0, zoom: 1 });
+efx.setCamera2D({ frame: [640, 480] });
 efx.setColorFilter({ saturation: 0.6, contrast: 1.1 });
 efx.setBlur({ radius: 2 });
 const scene = efx.createRenderTarget({ width: 512, height: 512 });
 
 efx.registerRenderHook(() => {
     efx.beginRenderTarget(scene);
-    efx.drawQuad(96, 96, 320, 320, { color: [1, 0.4, 0.1, 1] });
+    efx.drawQuad(96, 96, 320, 320, efx.whiteTexture, { color: [1, 0.4, 0.1, 1] });
     efx.endRenderTarget();
 
     efx.drawRenderTarget(scene, 256, 144, 512, 512);

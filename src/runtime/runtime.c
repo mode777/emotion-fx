@@ -122,10 +122,23 @@ efx_runtime *efx_runtime_new(char *const *args, int arg_count) {
         JS_CFUNC_DEF("log", 1, efx_js_log),
         JS_CFUNC_DEF("quit", 1, efx_js_quit),
         JS_CFUNC_DEF("args", 0, efx_js_args),
+        JS_CFUNC_DEF("setClearColor", 1, efx_js_setClearColor),
+        JS_CFUNC_DEF("setCamera2D", 1, efx_js_setCamera2D),
+        JS_CFUNC_DEF("createImageData", 1, efx_js_createImageData),
+        JS_CFUNC_DEF("createTexture", 1, efx_js_createTexture),
+        JS_CFUNC_DEF("drawQuad", 6, efx_js_drawQuad),
+        JS_CFUNC_DEF("setBlendMode", 1, efx_js_setBlendMode),
+        JS_CGETSET_DEF("whiteTexture", efx_js_whiteTexture, NULL),
     };
-    JS_SetPropertyFunctionList(rt->ctx, efx, efx_funcs, 3);
+    JS_SetPropertyFunctionList(rt->ctx, efx, efx_funcs,
+                               (int)(sizeof(efx_funcs) / sizeof(efx_funcs[0])));
     JS_SetPropertyStr(rt->ctx, glob, "efx", efx);
     JS_FreeValue(rt->ctx, glob);
+    if (efx_api_init(rt->ctx) < 0) {
+        fprintf(stderr, "player: api init failed\n");
+        efx_runtime_destroy(rt);
+        return NULL;
+    }
     return rt;
 }
 
@@ -136,6 +149,9 @@ void efx_runtime_destroy(efx_runtime *rt) {
     JS_FreeValue(rt->ctx, rt->hook_update);
     JS_FreeValue(rt->ctx, rt->hook_render);
     JS_FreeValue(rt->ctx, rt->host.quit_sentinel);
+    if (rt->host.has_white_texture) {
+        JS_FreeValue(rt->ctx, rt->host.white_texture);
+    }
     for (int i = 0; i < rt->host.arg_count; i++) {
         free(rt->host.args[i]);
     }
@@ -154,6 +170,15 @@ int efx_runtime_eval_file(efx_runtime *rt, const char *path) {
     }
     JSValue result = JS_Eval(rt->ctx, code, len, path, JS_EVAL_TYPE_GLOBAL);
     free(code);
+    if (JS_IsException(result)) {
+        return finish_exception(rt);
+    }
+    return 0;
+}
+
+int efx_runtime_eval_string(efx_runtime *rt, const char *name, const char *code) {
+    size_t len = strlen(code);
+    JSValue result = JS_Eval(rt->ctx, code, len, name, JS_EVAL_TYPE_GLOBAL);
     if (JS_IsException(result)) {
         return finish_exception(rt);
     }
@@ -202,4 +227,10 @@ int efx_runtime_quit_code(const efx_runtime *rt) {
 
 int efx_runtime_in_error(const efx_runtime *rt) {
     return rt->in_error;
+}
+
+void efx_runtime_collect(efx_runtime *rt) {
+    if (rt) {
+        JS_RunGC(rt->js_rt);
+    }
 }

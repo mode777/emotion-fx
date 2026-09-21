@@ -7,23 +7,29 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
 
 ## Current state
 
-- F1 (player skeleton) is **done**; F2 (2D layer) is next. The normative
-  milestone ladder is `openspec/specs/feature-roadmap`; the table below
-  summarizes it.
-- `src/` is a single core static library with four internal modules
-  (`platform`, `runtime`, `api`, `player`) plus a thin `main.c`
-  (ADR 0003). Sokol and quickjs-ng are vendored pinned snapshots under
-  `vendor/` (`vendor/README.md`, ADR 0006).
+- F1 (player skeleton) is **done**; F2 (2D layer) is **implemented, gate
+  pending CI verification** — see `openspec/changes/f2-2d-layer`. The
+  normative milestone ladder is `openspec/specs/feature-roadmap`; the
+  table below summarizes it.
+- `src/` is a single core static library (`platform`, `runtime`, `api`,
+  `player`, `render`) plus a thin `main.c` (ADR 0003). Sokol and
+  quickjs-ng are vendored pinned snapshots under `vendor/`
+  (`vendor/README.md`, ADR 0006); stb is vendored for golden-image I/O.
 - The `efx` player binary has two run modes (ADR 0007): windowed
   (`player <resource-root>`, runs `main.js`'s `update`/`render` hooks)
-  and headless (`player --script <file> [args…]`, exit-code contract).
-  Example resource roots: `examples/hello/`, `examples/browser/`.
-- The script-facing API so far is `efx.log`, `efx.quit`, `efx.args`
-  (ADR 0004), cataloged in `docs/js-api.md`.
-- `.github/workflows/ci.yml` is the four-target gate (ADR 0009): CMake
-  build + ctest smoke suite on Linux/Windows/macOS plus an Emscripten
-  job. `tests/` holds the suite; test scripts assert via exit codes
-  only (ADR 0007/0008).
+  and headless (`player --script <file> [args…]`, exit-code contract),
+  plus a capture mode for golden images (`--capture-frame N
+  --capture-output file`, ADR 0020).
+- The script-facing API: F1's `efx.log`, `efx.quit`, `efx.args`, plus F2's
+  2D layer — `setCamera2D` (virtual frame), `drawQuad`, `setBlendMode`,
+  `setClearColor`, `createImageData`, `createTexture`, `whiteTexture`
+  — cataloged in `docs/js-api.md` (F2 entries are current behavior).
+- Verification: ctest runs smoke + headless display-list/JS-API unit tests
+  everywhere; golden-image tests (6 committed scenes under
+  `tests/goldens/`) run where a display exists — Linux CI under
+  `xvfb-run` + llvmpipe, Emscripten in pinned headless Chrome
+  (ADR 0020). Local builds without a display configure with
+  `-DEFX_BUILD_GOLDEN_TESTS=OFF` (the default).
 - `package.json` exists only to install the OpenSpec CLI. The
   `openspec` binary is not on PATH: run `npm install` once, then invoke
   commands as `npx openspec <command>` from the repo root (e.g.
@@ -52,7 +58,7 @@ implements.
 | # | Milestone | Scope (one line) | Verification gate | Status |
 |---|-----------|------------------|-------------------|--------|
 | F1 | Player skeleton | CMake + vendored Sokol/QuickJS, window, resource root, `main.js` hooks, `--script` run mode | Builds on Win/Linux/macOS/Emscripten; script smoke test crosses the JS/C boundary and exits 0 on each | done |
-| F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | planned |
+| F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | implemented, gate pending CI |
 | F3 | 3D core | Camera, mesh slots, `drawMesh`, matrix math, depth test, vertex colors, procedural primitives | Golden images + math unit tests | planned |
 | F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); canned-shader strategy settled here at the latest | Golden images + lighting unit tests against a CPU reference implementation | planned |
 | F5 | Render targets + post FX | RTT, fullscreen-quad passes, color filter, blur | Golden images | planned |

@@ -31,6 +31,56 @@ add_player_test(smoke_root_no_entry ARGS "${F}/root_no_entry" EXPECT nonzero EXP
 add_player_test(smoke_root_missing_dir ARGS "${F}/no_such_dir" EXPECT nonzero EXPECT_ERR "not a directory")
 add_player_test(smoke_no_args EXPECT nonzero EXPECT_ERR "usage")
 add_player_test(smoke_unknown_option ARGS --frobnicate EXPECT nonzero EXPECT_ERR "unknown option")
+add_player_test(smoke_2d_validation ARGS "--script;${S}/s_2d_validation.js" EXPECT 0)
+
+# headless unit tests (display list + JS API against a mock GPU sink)
+function(add_unit_test TARGET CASE)
+    if(EMSCRIPTEN)
+        add_test(NAME ${TARGET}_${CASE}
+            COMMAND node $<TARGET_FILE:${TARGET}> ${CASE})
+    else()
+        add_test(NAME ${TARGET}_${CASE} COMMAND ${TARGET} ${CASE})
+    endif()
+endfunction()
+
+foreach(CASE
+    compose_camera compose_quad value_snapshot default_camera_viewport
+    blend_snapshot record_budget texture_lifecycle record_fields batching)
+    add_unit_test(efx_render_tests ${CASE})
+endforeach()
+foreach(CASE
+    white quad_record camera_snapshot src_oob budget texture_lifecycle
+    blend_snapshot default_camera)
+    add_unit_test(efx_api_tests ${CASE})
+endforeach()
+
+# golden-image tests (require a GPU/display; enable in CI or locally with a
+# running window system) — Emscripten goldens run through the browser job
+option(EFX_BUILD_GOLDEN_TESTS "Build/run golden-image capture tests" OFF)
+if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN)
+    add_executable(efx_imgdiff imgdiff.c)
+    target_include_directories(efx_imgdiff PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/stb)
+    if(MSVC)
+        target_compile_options(efx_imgdiff PRIVATE /W4 /WX)
+    else()
+        target_compile_options(efx_imgdiff PRIVATE -Wall -Wextra -Werror)
+    endif()
+
+    function(add_golden_test NAME)
+        add_test(NAME golden_${NAME}
+            COMMAND ${CMAKE_COMMAND}
+                -DGOLDEN_NAME=${NAME}
+                -DGOLDEN_PLAYER=$<TARGET_FILE:player>
+                -DGOLDEN_IMGDIFF=$<TARGET_FILE:efx_imgdiff>
+                -DGOLDEN_SCENE=${CMAKE_CURRENT_SOURCE_DIR}/goldens/${NAME}
+                -DBINARY_DIR=${CMAKE_BINARY_DIR}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/run_golden.cmake)
+    endfunction()
+
+    foreach(SCENE clear solid srcrect pivot blend camera)
+        add_golden_test(${SCENE})
+    endforeach()
+endif()
 
 if(EFX_BUILD_DEV_HARNESS AND NOT EMSCRIPTEN)
     function(add_harness_test NAME SCRIPT OUT_RE ERR_RE)

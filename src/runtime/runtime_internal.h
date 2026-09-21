@@ -9,6 +9,9 @@ struct efx_host_state {
     JSValue quit_sentinel;
     char **args;
     int arg_count;
+    /* F2 resource state */
+    JSValue white_texture;
+    int has_white_texture;
 };
 
 #endif

@@ -1,8 +1,10 @@
 #include "player/player.h"
 #include "runtime/runtime.h"
 #include "platform/platform.h"
+#include "render/render.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -18,7 +20,9 @@ static int usage(void) {
     fprintf(stderr,
             "usage:\n"
             "  player <resource-root>            run a resource folder\n"
-            "  player --script <file> [args...]  run a single script headless\n");
+            "  player --script <file> [args...]  run a single script headless\n"
+            "  player --capture-frame <N> --capture-output <file> <resource-root>\n"
+            "                                    render N frames, write PNG, exit (golden tests)\n");
     return 1;
 }
 
@@ -68,6 +72,9 @@ int efx_player_frame(void *ud) {
     if (r != EFX_HOOK_OK) {
         return 1;
     }
+    /* frame-end collection: unreferenced native resources are finalized
+       within roughly a frame (js-api resource lifecycle rules) */
+    efx_runtime_collect(rt);
     return efx_runtime_quit_requested(rt) || efx_runtime_in_error(rt);
 }
 
@@ -75,7 +82,7 @@ static int on_frame(void *ud) {
     return efx_player_frame(ud);
 }
 
-static int run_root_mode(const char *root) {
+static int run_root_mode(const char *root, const efx_platform_capture *capture) {
     if (!is_dir(root)) {
         fprintf(stderr, "player: resource root is not a directory: %s\n", root);
         return 1;
@@ -111,10 +118,15 @@ static int run_root_mode(const char *root) {
     int has_update = 0;
     int has_render = 0;
     efx_runtime_pick_hooks(rt, &has_update, &has_render);
+    efx_platform_desc desc;
+    memset(&desc, 0, sizeof(desc));
+    if (capture) {
+        desc.capture = *capture;
+    }
     efx_frame_hooks hooks;
     hooks.ud = rt;
     hooks.on_frame = on_frame;
-    efx_platform_run(hooks);
+    efx_platform_run(&desc, hooks);
     int exit_code;
     if (efx_runtime_in_error(rt)) {
         exit_code = 1;
@@ -123,7 +135,13 @@ static int run_root_mode(const char *root) {
     } else {
         exit_code = 0;
     }
+    /* release native resources while the GPU context is still alive:
+       runtime destroy runs finalizers -> deferred texture releases, then
+       render shutdown flushes them, then sokol goes down */
     efx_runtime_destroy(rt);
+    efx_render_end_frame();
+    efx_render_shutdown();
+    efx_platform_shutdown();
     return exit_code;
 }
 
@@ -138,9 +156,36 @@ int efx_player_main(int argc, char **argv) {
         }
         return run_script_mode(argv[2], argv + 3, argc - 3);
     }
-    if (argv[1][0] == '-') {
-        fprintf(stderr, "player: unknown option: %s\n", argv[1]);
+    /* capture flags must precede the resource root */
+    efx_platform_capture capture;
+    memset(&capture, 0, sizeof(capture));
+    int argi = 1;
+    while (argi < argc && argv[argi][0] == '-') {
+        if (strcmp(argv[argi], "--capture-frame") == 0) {
+            if (argi + 1 >= argc) {
+                fprintf(stderr, "player: --capture-frame requires a number\n");
+                return usage();
+            }
+            capture.frame = atoi(argv[argi + 1]);
+            argi += 2;
+        } else if (strcmp(argv[argi], "--capture-output") == 0) {
+            if (argi + 1 >= argc) {
+                fprintf(stderr, "player: --capture-output requires a path\n");
+                return usage();
+            }
+            capture.output = argv[argi + 1];
+            argi += 2;
+        } else {
+            fprintf(stderr, "player: unknown option: %s\n", argv[argi]);
+            return usage();
+        }
+    }
+    if ((capture.frame > 0) != (capture.output != NULL)) {
+        fprintf(stderr, "player: --capture-frame and --capture-output go together\n");
         return usage();
     }
-    return run_root_mode(argv[1]);
+    if (argi >= argc) {
+        return usage();
+    }
+    return run_root_mode(argv[argi], capture.frame > 0 ? &capture : NULL);
 }

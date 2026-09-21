@@ -21,6 +21,7 @@ add_subdirectory(vendor/quickjs-ng EXCLUDE_FROM_ALL)
 add_library(efx_core STATIC
     src/api/api.c
     src/runtime/runtime.c
+    src/render/render.c
 )
 target_include_directories(efx_core PUBLIC src)
 target_link_libraries(efx_core PUBLIC qjs)
@@ -33,8 +34,15 @@ if(NOT MSVC)
     target_compile_definitions(efx_core PRIVATE _POSIX_C_SOURCE=200809L)
 endif()
 
-add_library(efx_platform STATIC src/platform/platform.c)
+add_library(efx_platform STATIC
+    src/platform/platform.c
+    src/platform/pipeline.c
+)
 target_include_directories(efx_platform PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/vendor/sokol)
+
+add_library(efx_capture STATIC src/platform/capture.c)
+target_include_directories(efx_capture PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/vendor/sokol ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
+target_link_libraries(efx_capture PUBLIC efx_platform)
 if(MSVC)
     target_compile_options(efx_platform PRIVATE /W4)
 elseif(NOT EMSCRIPTEN)
@@ -48,7 +56,7 @@ add_executable(player
     src/main.c
     src/player/player.c
 )
-target_link_libraries(player PRIVATE efx_core efx_platform)
+target_link_libraries(player PRIVATE efx_core efx_platform efx_capture)
 
 if(EMSCRIPTEN)
     set_target_properties(player PROPERTIES SUFFIX ".js")
@@ -62,9 +70,23 @@ if(EMSCRIPTEN)
         -sENVIRONMENT=web
         "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/examples/browser@/examples/browser"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web_pre.js")
+
+    # browser capture build for the Emscripten golden-image job (ADR 0020):
+    # goldens scenes are preloaded to /goldens/<scene>, captures are written
+    # to MEMFS /captures/<scene>.png and read back by tools/run_web_goldens.mjs
+    if(EFX_BUILD_GOLDEN_TESTS)
+        add_executable(player_web_golden src/main.c src/player/player.c)
+        target_link_libraries(player_web_golden PRIVATE efx_core efx_platform efx_capture)
+        set_target_properties(player_web_golden PROPERTIES SUFFIX ".js")
+        target_link_options(player_web_golden PRIVATE
+            -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2
+            -sENVIRONMENT=web
+            -sEXPORTED_RUNTIME_METHODS='["FS","callMain"]'
+            "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens@/goldens")
+    endif()
 elseif(APPLE)
     enable_language(OBJC)
-    set_source_files_properties(src/platform/platform.c PROPERTIES LANGUAGE OBJC)
+    set_source_files_properties(src/platform/platform.c src/platform/pipeline.c src/platform/capture.c PROPERTIES LANGUAGE OBJC)
     target_link_libraries(efx_platform PRIVATE
         "-framework Cocoa" "-framework QuartzCore"
         "-framework Metal" "-framework MetalKit")
@@ -90,6 +112,37 @@ option(EFX_BUILD_DEV_HARNESS "Build the temporary dev harness (F1 implementation
 
 enable_testing()
 add_subdirectory(tests)
+
+# headless display-list unit tests (ADR 0019 record/assert gate)
+add_executable(efx_render_tests
+    src/render/render.c
+    tests/unit/render_tests.c
+)
+target_include_directories(efx_render_tests PRIVATE src)
+if(MSVC)
+    target_compile_options(efx_render_tests PRIVATE /W4 /WX)
+else()
+    target_compile_options(efx_render_tests PRIVATE -Wall -Wextra -Werror)
+endif()
+
+# headless JS-API tests (mock GPU sink + real quickjs runtime + bindings)
+add_executable(efx_api_tests
+    src/api/api.c
+    src/runtime/runtime.c
+    src/render/render.c
+    tests/unit/api_tests.c
+)
+target_include_directories(efx_api_tests PRIVATE src)
+target_link_libraries(efx_api_tests PRIVATE qjs)
+if(MSVC)
+    target_compile_options(efx_api_tests PRIVATE /W4 /WX)
+    target_compile_definitions(efx_api_tests PRIVATE _CRT_SECURE_NO_WARNINGS)
+else()
+    target_compile_options(efx_api_tests PRIVATE -Wall -Wextra -Werror)
+endif()
+if(NOT MSVC)
+    target_compile_definitions(efx_api_tests PRIVATE _POSIX_C_SOURCE=200809L)
+endif()
 
 if(EFX_BUILD_DEV_HARNESS AND NOT EMSCRIPTEN)
     add_executable(efx_dev_harness

@@ -8,6 +8,7 @@ replacing the snapshot and editing the table below.
 |---|---|---|---|
 | `sokol/` | floooh/sokol | master @ `2e75443dbd4940b5aa8d76a8e479f8e4b270b9a3` | https://github.com/floooh/sokol (only `sokol_app.h`, `sokol_gfx.h`, `sokol_glue.h`) |
 | `quickjs-ng/` | quickjs-ng/quickjs | v0.17.0 (QJS 0.17.0) | https://github.com/quickjs-ng/quickjs, release tarball `v0.17.0.tar.gz` |
+| `stb/` | nothings/stb | master @ `2c980bb59875b0d32144a71867fbdebb2f77cd20` (`stb_image` v2.30, `stb_image_write` v1.16) | https://github.com/nothings/stb (only `stb_image.h`, `stb_image_write.h`) |
 
 Notes:
 
@@ -23,3 +24,9 @@ Notes:
 - GLM is a recorded future dependency (math decision from F1); it is
   deliberately NOT vendored yet — first use is F3 (see
   `openspec/changes/f1-player-skeleton/design.md`, D6).
+- stb is vendored for golden-image PNG I/O (F2 verification harness):
+  `stb_image_write` encodes captured frames, `stb_image` decodes committed
+  goldens for comparison. Both are single-header public-domain/MIT; the
+  implementation TUs live in the tools that need them (`tests/imgdiff.c`,
+  `src/platform/capture.c`). Evaluation record:
+  `openspec/changes/f2-2d-layer/proposal.md`.

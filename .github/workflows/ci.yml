@@ -14,6 +14,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      # deterministic rendering for the golden jobs (ADR 0020)
+      EMSDK_VERSION: 3.1.64
     steps:
       - uses: actions/checkout@v4
 
@@ -21,15 +24,22 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxi-dev libxcursor-dev libgl1-mesa-dev
+          sudo apt-get install -y libx11-dev libxi-dev libxcursor-dev libgl1-mesa-dev xvfb
 
       - name: Configure
-        run: cmake -B build -DEFX_BUILD_DEV_HARNESS=ON -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DEFX_BUILD_DEV_HARNESS=ON -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Smoke tests
+      - name: Smoke + unit + golden tests (Linux, software GL)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ctest --test-dir build -C Release --output-on-failure
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+
+      - name: Smoke + unit + golden tests (Windows WARP / macOS GPU)
+        if: runner.os != 'Linux'
         run: ctest --test-dir build -C Release --output-on-failure
 
   emscripten:
@@ -40,7 +50,7 @@ jobs:
 
       - uses: mymindstorm/setup-emsdk@v14
         with:
-          version: latest
+          version: '3.1.64' # pinned — ADR 0020 CI determinism
 
       - name: Configure
         run: emcmake cmake -B build-em -DCMAKE_BUILD_TYPE=Release
@@ -50,6 +60,76 @@ jobs:
 
       - name: Smoke tests (headless under Node)
         run: ctest --test-dir build-em --output-on-failure
+
+  golden-web:
+    name: golden tests (emscripten / headless chrome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.64' # pinned — ADR 0020 CI determinism
+
+      - name: Configure capture build (Emscripten)
+        run: emcmake cmake -B build-web-golden -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build capture player
+        run: cmake --build build-web-golden --target player_web_golden
+
+      - name: Configure native tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxi-dev libxcursor-dev libgl1-mesa-dev
+          cmake -B build-golden-tools -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build comparator
+        run: cmake --build build-golden-tools --target efx_imgdiff
+
+      - name: Install pinned Chrome (major-version pin)
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: '131'
+
+      - name: Install puppeteer-core
+        run: npm install --no-save puppeteer-core
+
+      - name: Golden tests via headless Chrome (SwiftShader WebGL)
+        run: node tools/run_web_goldens.mjs
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+
+  generate-goldens:
+    name: generate golden images (manual bootstrap)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux window dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxi-dev libxcursor-dev libgl1-mesa-dev xvfb
+
+      - name: Configure + build (golden capture)
+        run: |
+          cmake -B build -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target player
+
+      - name: Capture golden images (canonical: Linux llvmpipe)
+        run: |
+          for scene in clear solid srcrect pivot blend camera; do
+            xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 \
+              ./build/player --capture-frame 2 \
+                --capture-output tests/goldens/$scene/golden.png tests/goldens/$scene
+          done
+
+      - name: Upload goldens artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldens
+          path: tests/goldens/*/golden.png
 
   pages:
     name: deploy web player (github pages)

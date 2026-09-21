@@ -3,9 +3,21 @@
 An old-school, PS2-era 3D engine: fixed-function pipeline, super lightweight,
 scripted in ES6. See `vision.md` for the product vision and
 `openspec/specs/feature-roadmap` for the milestone ladder. Current status:
-**F1 (player skeleton)**.
+**F2 (2D layer) implemented; gate verified via CI**.
 
-## What F1 delivers
+## What F2 delivers (on top of F1)
+
+- The **2D drawing layer**: a virtual-pixel projection frame
+  (`efx.setCamera2D`), `efx.drawQuad` with tint / rotation / scale /
+  pixel-space `sourceRect`, CPU→GPU textures (`createImageData`,
+  `createTexture`), blending modes (`alpha`, `additive`, `subtractive`), and
+  the engine-owned `efx.whiteTexture` for solid rects.
+- The **re-orderable display list** between the immediate-mode API and sokol
+  (ADR 0019), unit-tested headlessly (record → assert, no GPU).
+- The **golden-image verification harness** (ADR 0020): capture run mode
+  (`--capture-frame N --capture-output file`), committed PNG goldens under
+  `tests/goldens/`, tolerance comparator (`tests/imgdiff.c`), and
+  software-rendered, toolchain-pinned CI jobs.
 
 - A single-binary **player** built with CMake for Windows, Linux, macOS, and
   Emscripten.
@@ -17,7 +29,6 @@ scripted in ES6. See `vision.md` for the product vision and
   exit code (the automated-test vehicle).
 - The engine JS API namespace `efx`: `efx.log(msg)`, `efx.quit(code)`,
   `efx.args()` — the binding pattern all future engine functions follow.
-
 ## JavaScript API
 
 The normative script-facing API reference — current behavior plus the
@@ -51,24 +62,38 @@ build/player examples/hello          # window + frame loop
 build/player --script tests/scripts/s_quit3.js   # headless; exits 3
 ```
 
-## Testing / the F1 gate
+## Testing / the F2 gate
 
-The smoke suite is ctest-based and headless (`--script` mode), so it runs on
-every target including Emscripten (under Node):
+The suite is ctest-based: headless smoke tests (`--script` mode), headless
+display-list + JS-API unit tests (mock GPU sink, no window needed), and —
+where a GPU/display exists — golden-image capture tests:
 
 ```sh
+cmake -B build -DEFX_BUILD_GOLDEN_TESTS=ON
+cmake --build build
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-CI (`.github/workflows/ci.yml`) runs the build matrix and the full suite on
-ubuntu, windows, macOS, and Emscripten on every push to `main`. A red run
-blocks the roadmap ladder per `feature-roadmap`.
+`EFX_BUILD_GOLDEN_TESTS` defaults OFF (CI turns it on; Linux CI renders
+under `xvfb-run` with `LIBGL_ALWAYS_SOFTWARE=1`). The Emscripten job runs
+its goldens through pinned headless Chrome with SwiftShader
+(`tools/run_web_goldens.mjs`).
+
+**Regenerating goldens** — only when intended output changed:
+
+```sh
+cmake -B build -DEFX_BUILD_GOLDEN_TESTS=ON && cmake --build build
+./build/player --capture-frame 2 --capture-output tests/goldens/<scene>/golden.png tests/goldens/<scene>
+```
+
+Review the regenerated `golden.png` carefully before committing: goldens are
+the reference, so a diff here is a deliberate rendering change. CI fails if
+the toolchain or a code change alters output without a committed regen.
 
 Window behavior (window opens, hooks run per frame, clean exit on close) is
-verified manually per desktop platform for F1 — CI runners have no display.
-Checklist: launch `build/player examples/hello`, confirm a 1024x600 window
-with a dark blue-grey clear color, frame logs on stdout, clean exit 0 on
-close after the 60-frame auto-quit (or immediately on manual close).
+verified manually per desktop platform — CI runners have no real display.
+Checklist: launch `build/player examples/hello`, confirm a window opens with
+frame logs on stdout and clean exit 0 on close after the 60-frame auto-quit.
 
 ## Notes
 
@@ -76,5 +101,5 @@ close after the 60-frame auto-quit (or immediately on manual close).
   builds are fully offline.
 - sokol's Linux backend needs X11/GL dev packages at build time; no display
   is needed for headless runs and tests.
-- CI tracks `latest` emsdk for F1; pinning the Emscripten toolchain happens
-  in F2 together with golden-image determinism.
+- The Emscripten toolchain is pinned to an exact emsdk version in
+  `.github/workflows/ci.yml` (golden-image determinism, ADR 0020).
