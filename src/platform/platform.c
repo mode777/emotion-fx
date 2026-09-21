@@ -46,6 +46,7 @@ static sg_pass_action efx_pass_action(void) {
     memset(&pa, 0, sizeof(pa));
     float c[4];
     efx_render_clear_color(c);
+    fprintf(stderr, "efx: trace clear %.2f %.2f %.2f %.2f\n", c[0], c[1], c[2], c[3]);
     pa.colors[0].load_action = SG_LOADACTION_CLEAR;
     pa.colors[0].clear_value = (sg_color){c[0], c[1], c[2], c[3]};
     return pa;

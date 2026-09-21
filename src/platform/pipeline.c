@@ -126,28 +126,49 @@ static uint32_t pack_color(const float c[4]) {
     return (a << 24) | (b << 16) | (g << 8) | r;
 }
 
-static pipe_vertex *emit_quad(pipe_vertex *v, const efx_quad_record *r) {
-    /* strip order: TL, TR, BL, BR; local space is 0..w, 0..h */
+static pipe_vertex emit_vert(const efx_quad_record *r, int i) {
+    /* corner i in strip order: TL, TR, BL, BR; local space is 0..w, 0..h */
     static const float lu[4] = {0, 1, 0, 1};
     static const float lv[4] = {0, 0, 1, 1};
     static const float su[4] = {0, 1, 0, 1};
     static const float sv[4] = {0, 0, 1, 1};
+    pipe_vertex v;
     const uint32_t packed = pack_color(r->color);
-    for (int i = 0; i < 4; i++) {
+    {
         float fx = r->m.a * lu[i] * r->w + r->m.c * lv[i] * r->h + r->m.tx;
         float fy = r->m.b * lu[i] * r->w + r->m.d * lv[i] * r->h + r->m.ty;
-        v->x = 2.0f * fx / r->frame_w - 1.0f;
-        v->y = 1.0f - 2.0f * fy / r->frame_h;
-        v->u = (r->sx + su[i] * r->sw) / r->tw;
-        v->v = (r->sy + sv[i] * r->sh) / r->th;
-        v->r = (uint8_t)(packed & 0xff);
-        v->g = (uint8_t)((packed >> 8) & 0xff);
-        v->b = (uint8_t)((packed >> 16) & 0xff);
-        v->a = (uint8_t)((packed >> 24) & 0xff);
-        v++;
+        v.x = 2.0f * fx / r->frame_w - 1.0f;
+        v.y = 1.0f - 2.0f * fy / r->frame_h;
+        v.u = (r->sx + su[i] * r->sw) / r->tw;
+        v.v = (r->sy + sv[i] * r->sh) / r->th;
+        v.r = (uint8_t)(packed & 0xff);
+        v.g = (uint8_t)((packed >> 8) & 0xff);
+        v.b = (uint8_t)((packed >> 16) & 0xff);
+        v.a = (uint8_t)((packed >> 24) & 0xff);
     }
     return v;
 }
+
+static pipe_vertex *emit_quad(pipe_vertex *v, const efx_quad_record *r) {
+    for (int i = 0; i < 4; i++) {
+        *v++ = emit_vert(r, i);
+    }
+    return v;
+}
+
+static pipe_vertex *emit_quad_bridged(pipe_vertex *v, const efx_quad_record *r) {
+    /* continue a strip: duplicate last vertex, then first vertex of the new
+       quad twice, then the remaining three (two degenerate triangles) */
+    v[0] = v[-1];
+    v[1] = emit_vert(r, 0);
+    v[2] = v[1];
+    v += 3;
+    for (int i = 1; i < 4; i++) {
+        *v++ = emit_vert(r, i);
+    }
+    return v;
+}
+
 
 void efx_pipeline_install(void) {
     if (P.installed) {
@@ -241,7 +262,7 @@ void efx_pipeline_play(void) {
         return;
     }
 
-    int cap = count * 4 + (count > 1 ? (count - 1) : 0);
+    int cap = count * 6 + 4;
     if (cap > P.scratch_cap) {
         pipe_vertex *grown = realloc(P.scratch, (size_t)cap * sizeof(pipe_vertex));
         if (!grown) {
@@ -265,10 +286,10 @@ void efx_pipeline_play(void) {
         int start = (int)(v - P.scratch);
         for (int q = 0; q < runs[ri].count; q++) {
             if (q > 0) {
-                v[0] = v[-1]; /* degenerate bridge: repeat last vertex */
-                v++;
+                v = emit_quad_bridged(v, &records[runs[ri].start + q]);
+            } else {
+                v = emit_quad(v, &records[runs[ri].start + q]);
             }
-            v = emit_quad(v, &records[runs[ri].start + q]);
         }
         run_verts[ri] = (int)(v - P.scratch) - start;
     }
