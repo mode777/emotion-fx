@@ -30,6 +30,7 @@ directory holds only what stays true after a change is archived.
 | [0018](0018-script-driven-posing.md) | Accepted | Script-driven posing via `poseMesh`; no engine playback state |
 | [0019](0019-display-list-recording-semantics.md) | Accepted | Display list records are frame-transient; value-snapshot small state, handle-reference resources |
 | [0020](0020-golden-image-verification.md) | Accepted | Golden images: PNG via vendored stb, ±2/255 tolerance with a 0.5% pixel exemption, software rasterizers and pinned toolchains in CI |
+| [0021](0021-sokol-shdc-canned-shaders.md) | Accepted | Canned shaders come from sokol-shdc; one GLSL source, no hand-written per-backend flavors |
 
 ## Adding a decision
 
