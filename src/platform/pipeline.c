@@ -178,8 +178,8 @@ void efx_pipeline_install(void) {
     memset(&P, 0, sizeof(P));
 
     P.shd = sg_make_shader(&(sg_shader_desc){
-        .vertex_func.source = VS_SRC,
-        .fragment_func.source = FS_SRC,
+        .vertex_func = {.source = VS_SRC, .entry = "vs_main"},
+        .fragment_func = {.source = FS_SRC, .entry = "fs_main"},
         .attrs = {
             [0] = {.glsl_name = "a_pos", .hlsl_sem_name = "A_POS"},
             [1] = {.glsl_name = "a_uv", .hlsl_sem_name = "A_UV"},
