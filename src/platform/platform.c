@@ -136,11 +136,12 @@ static void efx_frame_cb(void) {
         sg_end_pass();
     }
 #else
+    fprintf(stderr, "efx: t4 pre-begin\n");
     sg_begin_pass(&(sg_pass){
         .action = efx_pass_action(),
         .swapchain = sglue_swapchain(),
     });
-    fprintf(stderr, "efx: t4 pass-begin\n");
+    fprintf(stderr, "efx: t4b begin-done\n");
     efx_pipeline_play();
     fprintf(stderr, "efx: t5 play\n");
     sg_end_pass();

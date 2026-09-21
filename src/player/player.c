@@ -90,7 +90,13 @@ int efx_player_frame(void *ud) {
 #endif
     /* frame-end collection: unreferenced native resources are finalized
        within roughly a frame (js-api resource lifecycle rules) */
+#if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: t3g pre-collect\n");
+#endif
     efx_runtime_collect(rt);
+#if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: t3h collect-done\n");
+#endif
     return efx_runtime_quit_requested(rt) || efx_runtime_in_error(rt);
 }
 
