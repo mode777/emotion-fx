@@ -83,8 +83,8 @@ if(EMSCRIPTEN)
             -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2
             -sASSERTIONS=1
             -sENVIRONMENT=web
+            "-sEXPORTED_RUNTIME_METHODS=['FS','callMain']"
             "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web_golden_pre.js"
-            "--post-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web_golden_post.js"
             "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens@/goldens")
     endif()
 elseif(APPLE)
