@@ -250,23 +250,15 @@ void efx_pipeline_install(void) {
 
 void efx_pipeline_play(void) {
     if (!P.installed) {
-        fprintf(stderr, "efx: play: not installed\n");
         return;
     }
     int count = 0;
     const efx_quad_record *records = efx_render_records(&count);
-#if defined(__EMSCRIPTEN__)
-    fprintf(stderr, "efx: play entry count=%d\n", count);
-#endif
     if (count <= 0) {
-        fprintf(stderr, "efx: play: EMPTY LIST\n");
         return;
     }
     int run_count = 0;
     const efx_draw_run *runs = efx_render_runs(&run_count);
-#if defined(__EMSCRIPTEN__)
-    fprintf(stderr, "efx: play records=%d runs=%d\n", count, run_count);
-#endif
     if (!runs || run_count <= 0) {
         return;
     }
@@ -312,9 +304,6 @@ void efx_pipeline_play(void) {
         sg_bindings bnd = {0};
         bnd.vertex_buffers[0] = P.vbuf;
         pipe_tex *t = (pipe_tex *)efx_render_texture_native(runs[ri].texture);
-#if defined(__EMSCRIPTEN__)
-        fprintf(stderr, "efx: run %d tex-native=%p\n", ri, (void *)(t ? t->view.id : 0));
-#endif
         if (!t) {
             continue;
         }

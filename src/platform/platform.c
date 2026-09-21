@@ -87,13 +87,10 @@ static void efx_capture_setup(void) {
 #endif
 
 static void efx_init_cb(void) {
-    fprintf(stderr, "efx: t1 pre-sg\n");
     sg_setup(&(sg_desc){
         .environment = sglue_environment(),
     });
-    fprintf(stderr, "efx: t2 sg ok\n");
     efx_pipeline_install();
-    fprintf(stderr, "efx: t3 pipe ok\n");
 #ifdef SOKOL_METAL
     if (g_capture.frame > 0) {
         efx_capture_setup();
@@ -108,7 +105,6 @@ static void efx_frame_cb(void) {
 #endif
     efx_render_begin_frame();
     efx_render_set_viewport(sapp_width(), sapp_height());
-    fprintf(stderr, "efx: t3b pre-hooks\n");
     if (g_hooks.on_frame && g_hooks.on_frame(g_hooks.ud)) {
 #if defined(__EMSCRIPTEN__)
     
@@ -138,50 +134,24 @@ static void efx_frame_cb(void) {
         sg_end_pass();
     }
 #else
-    fprintf(stderr, "efx: t4 pre-begin\n");
     sg_begin_pass(&(sg_pass){
         .action = efx_pass_action(),
         .swapchain = sglue_swapchain(),
     });
-    fprintf(stderr, "efx: t4b begin-done\n");
     efx_pipeline_play();
-    fprintf(stderr, "efx: t5 play\n");
     sg_end_pass();
 #endif
     sg_commit();
-    fprintf(stderr, "efx: t6 commit\n");
     efx_render_end_frame();
 
 #if defined(__EMSCRIPTEN__)
-    fprintf(stderr, "efx: frame-end capture=%d gf=%d\n", g_capture.frame, g_frame);
     if (g_capture.frame > 0 && g_frame >= g_capture.frame) {
         /* web: read back via canvas.toDataURL (native glReadPixels from the
            default framebuffer crashes headless shells with SwiftShader) */
         EM_ASM({
             try {
-                const c = document.getElementById('canvas');
-                const gli = c.getContext('webgl2');
-                console.log('[gl-err] pending gl error code=' + gli.getError());
-                {
-                    const pxs = new Uint8Array(4);
-                    gli.readPixels(320, 240, 1, 1, gli.RGBA, gli.UNSIGNED_BYTE, pxs);
-                    console.log('[gl-probe] sokol-content px=' + pxs.join(','));
-                }
-                console.log('[gl-state] fbo=' + gli.getParameter(gli.FRAMEBUFFER_BINDING) +
-                    ' program=' + gli.getParameter(gli.CURRENT_PROGRAM) +
-                    ' viewport=' + gli.getParameter(gli.VIEWPORT).join(',') +
-                    ' blend=' + gli.isEnabled(gli.BLEND));
-                gli.clearColor(1, 0, 0, 1);
-                gli.clear(gli.COLOR_BUFFER_BIT);
-                const url = c.toDataURL('image/png');
+                const url = document.getElementById('canvas').toDataURL('image/png');
                 Module['webGoldenCapture'] = url.substring(url.indexOf(',') + 1);
-                const gl = c.getContext('webgl2');
-                if (gl) {
-                    const px = new Uint8Array(4);
-                    gl.readPixels(320, 240, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-                    console.log('[capture-probe] in-frame px=' + px.join(',') +
-                        ' err=' + gl.getError() + ' ctxLoss=' + gl.isContextLost());
-                }
             } catch (e) {
                 console.error('golden capture export failed:', e);
             }
