@@ -9,6 +9,11 @@ else()
     set(CMAKE_C_EXTENSIONS OFF)
 endif()
 
+if(EMSCRIPTEN)
+    # EM_ASM requires GNU statement expressions
+    set(CMAKE_C_EXTENSIONS ON)
+endif()
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
