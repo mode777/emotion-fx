@@ -43,6 +43,16 @@ function(add_unit_test TARGET CASE)
     endif()
 endfunction()
 
+function(unit_test_target_props TARGET)
+    if(UNIX)
+        target_link_libraries(${TARGET} PRIVATE m)
+    endif()
+    if(EMSCRIPTEN)
+        # record-budget tests grow past the default 16 MB heap
+        target_link_options(${TARGET} PRIVATE -sALLOW_MEMORY_GROWTH=1)
+    endif()
+endfunction()
+
 foreach(CASE
     compose_camera compose_quad value_snapshot default_camera_viewport
     blend_snapshot record_budget texture_lifecycle record_fields batching)
@@ -61,6 +71,9 @@ if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN)
     # embeds stb implementations -> relaxed warnings for this tool
     add_executable(efx_imgdiff imgdiff.c)
     target_include_directories(efx_imgdiff PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/stb)
+    if(UNIX)
+        target_link_libraries(efx_imgdiff PRIVATE m)
+    endif()
     if(MSVC)
         target_compile_options(efx_imgdiff PRIVATE /W3)
     else()
