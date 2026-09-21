@@ -25,6 +25,7 @@ directory holds only what stays true after a change is archived.
 | [0013](0013-resource-taxonomy-eight-opaque-types.md) | Superseded by 0014 | Resource taxonomy: eight GC-finalized opaque types |
 | [0014](0014-skinning-follows-gltf-data-model.md) | Accepted | Skinning follows the glTF data model; seven resource types (weights in MeshData, Skeleton ≈ glTF skin) |
 | [0015](0015-fixed-function-is-consumer-api-contract.md) | Accepted | Fixed-function is a consumer-API contract; internals use Sokol's programmable pipeline with canned shaders |
+| [0016](0016-explicit-hook-registration-implicit-init.md) | Accepted | Lifecycle via explicit stacking hook registration; loading main.js is the implicit init |
 
 ## Adding a decision
 

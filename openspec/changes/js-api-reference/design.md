@@ -138,23 +138,26 @@ vision.md — are recorded in the document's "Open questions" section as links
 back to vision, **not** invented APIs. A vision→section traceability table
 makes the mapping checkable.
 
-### D9: Hook signatures `init()` / `update(dt)` documented as target contract
-The document records `init()` / `update(dt)` / `render()` as the contract.
-`init()` runs once after the script is loaded and before the first frame —
-setup that needs the engine fully ready, distinct from top-level `main.js`
-code which F1 evaluates at load time. F1 currently calls hooks with no
-arguments and does not invoke `init()` at all; `dt` (seconds since the
-previous frame) and `init()` are ratified by the next runtime change (F2 at
-the latest) — both additive and backward-compatible (hook absence is already
-tolerated). **Alternative rejected:** treating top-level code as init — it
-already has defined load-time semantics in F1 and cannot express "after the
-runtime is ready".
+### D9: Lifecycle — explicit registration, implicit init
+Supersedes the earlier sketch (global `init()`/`update(dt)`/`render()`
+hooks): `efx.registerUpdateHook(fn)` / `efx.registerRenderHook(fn)` are the
+target contract — callbacks stack in registration order, each registration
+returns an unsubscribe function, and `update` callbacks receive `dt`
+(seconds since the previous frame). Loading `main.js` is the implicit init:
+the runtime guarantees full engine readiness (window, GL context, `efx`
+namespace, bundled high-level layer) *before* script evaluation — F1's
+load-before-window order flips — so top-level code is setup and the
+separate `init()` hook is dropped. F1's global `update`/`render` remain as
+load-time sugar (the player-runtime F1 gate contract is unaffected). The
+REPL registers through the same functions. Rationale and rejected
+alternatives: ADR 0016.
 
 ### D10: One complete sample per milestone section
 Each milestone section (F1–F8) carries one short but complete `main.js`
 sample illustrating that milestone's catalog entries: the F1 sample uses
-only current behavior, the F2–F8 samples use their provisional APIs plus the
-`init()` hook. Samples are illustrative contracts-to-implement, not tested
+only current behavior, the F2–F8 samples use their provisional APIs with
+top-level setup and explicit hook registration (D9). Samples are
+illustrative contracts-to-implement, not tested
 examples under `examples/`.
 
 ### D11: Math representation — plain JS data at the boundary, GLM internal

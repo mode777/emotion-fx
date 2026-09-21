@@ -29,9 +29,10 @@ instead of making ad-hoc naming decisions inside its own change.
   engine, derived from vision.md and the F1 implementation:
   - Conventions: single global `efx` namespace, camelCase verb-first naming,
     option-object parameters, degrees/units policy.
-  - Lifecycle contract: `main.js` entry script with `init`/`update`/`render`
-    hooks (F1 implements top-level setup plus `update`/`render`; `init` and
-    the `dt` argument are the target contract).
+  - Lifecycle contract: loading `main.js` is the implicit init (engine
+    fully ready before it executes); frame callbacks via explicit, stacking
+    `efx.registerUpdateHook`/`efx.registerRenderHook` registration with
+    unsubscribe (F1's global `update`/`render` remain as load-time sugar).
   - Full function catalog grouped by milestone F1→F8 (environment/utilities,
     2D drawing, camera, meshes and math, materials and lights, render targets
     and post FX, resource loading, skinning/animation, high-level

@@ -46,3 +46,9 @@
 
 - [x] 9.1 Write ADR 0015 (`docs/decisions/0015-fixed-function-is-consumer-api-contract.md`): "no programmable shaders" is a consumer-API contract — scripts never see/modify shaders; internals MUST use Sokol's programmable pipeline with engine-owned canned shaders; review test = consumer-API surface, not internal use; + index row
 - [x] 9.2 Correct over-broad wording everywhere: vision.md property, AGENTS.md stack + constraint lines, `openspec/config.yaml` context, `docs/js-api.md` traceability row, ADR 0014 (deliberately-not-copied note + GPU-skinning rejection reworded from "impossible by constraint" to engineering economics), design.md D6; run `openspec validate --strict`
+
+## 10. Iteration: lifecycle via explicit hook registration
+
+- [x] 10.1 Write ADR 0016 (`docs/decisions/0016-explicit-hook-registration-implicit-init.md`): `efx.registerUpdateHook`/`efx.registerRenderHook` as the normative lifecycle API (ES6 callbacks, stacking in registration order, unsubscribe returned, `dt` on update hooks); loading `main.js` is the implicit init — runtime guarantees full engine readiness before script evaluation (F1's load-before-window order flips); F1 globals remain load-time sugar so the F1 gate and examples stay valid; REPL rationale + index row
+- [x] 10.2 Sync artifacts: spec lifecycle clause (registration model replaces `init`/`update`/`render` globals), proposal lifecycle bullet, design.md D9 rewrite + D10 samples note
+- [x] 10.3 Rework `docs/js-api.md`: Lifecycle hooks section (implicit init, registration sketch, sugar rule, REPL note), F1 section pointer, F2–F8 samples to top-level setup + `registerUpdateHook`/`registerRenderHook`, open questions + traceability row; run `openspec validate --strict`
