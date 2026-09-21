@@ -24,8 +24,10 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   build + ctest smoke suite on Linux/Windows/macOS plus an Emscripten
   job. `tests/` holds the suite; test scripts assert via exit codes
   only (ADR 0007/0008).
-- `package.json` exists only to install the OpenSpec CLI (`npm install`,
-  then `npx openspec`).
+- `package.json` exists only to install the OpenSpec CLI. The
+  `openspec` binary is not on PATH: run `npm install` once, then invoke
+  commands as `npx openspec <command>` from the repo root (e.g.
+  `npx openspec status --change <name>`, `npx openspec validate --strict`).
 
 ## Stack
 
@@ -54,15 +56,15 @@ implements.
 | F3 | 3D core | Camera, mesh slots, `drawMesh`, matrix math, depth test, vertex colors, procedural primitives | Golden images + math unit tests | planned |
 | F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); canned-shader strategy settled here at the latest | Golden images + lighting unit tests against a CPU reference implementation | planned |
 | F5 | Render targets + post FX | RTT, fullscreen-quad passes, color filter, blur | Golden images | planned |
-| F6 | Resource packaging | Zip resource root, real asset import (asset format decided here), interactive REPL | Script tests load assets from a zip; REPL exercised via piped stdin | planned |
+| F6 | Resource packaging | Zip resource root, glTF 2.0 asset import — meshes, images, skins, animation clips (profile decided here), interactive REPL | Script tests load assets from a zip; REPL exercised via piped stdin | planned |
 | F7 | Skinning + animation | CPU skinning into a mesh slot, skeleton/animation import, play/pause/blend | FK joint-transform tests vs CPU reference + golden images | planned |
 | F8 | High-level JS + text | `drawModel`, `drawText` (font atlas built on quads), demo resource pack | Golden images; demo pack runs end-to-end on all four targets | planned |
 
 Deferred cross-cutting decisions settle inside specific milestones, not
 before: golden-image tolerance + CI determinism (incl. emsdk pinning) in
-F2, canned-shader strategy by F4 at the latest, asset format in F6.
-F1's deferred set (toolchain, quickjs flavor, math library) is settled —
-see `docs/decisions/`.
+F2, canned-shader strategy by F4 at the latest, glTF import profile in
+F6. F1's deferred set (toolchain, quickjs flavor, math library) is
+settled — see `docs/decisions/`.
 
 ## Non-negotiable design constraints (easy to get wrong)
 
@@ -110,7 +112,8 @@ rayjs (QuickJS integration + stripping QuickJS for cross-platform).
 ## Not yet decided
 
 Golden-image tolerance and CI determinism (F2), the canned-shader
-strategy (by F4 at the latest), and the asset format (F6) are open —
-settle them via OpenSpec proposals, not by silently picking defaults.
-The Roadmap section assigns each deferred decision a latest-settling
-milestone.
+strategy (by F4 at the latest), and the glTF import profile (F6) are
+open — settle them via OpenSpec proposals, not by silently picking
+defaults. The Roadmap section assigns each deferred decision a
+latest-settling milestone. The glTF 2.0 import format itself is pinned
+in the roadmap; only the profile remains open.

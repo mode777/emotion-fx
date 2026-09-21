@@ -379,12 +379,13 @@ efx.registerRenderHook(() => {
 
 ### F6 — Resources (provisional)
 
-Scope from roadmap F6: zip resource root, real asset import (asset format
-decided here), interactive REPL. Paths are relative to the resource root
+Scope from roadmap F6: zip resource root, glTF 2.0 asset import (meshes,
+images, skins, animation clips — the glTF profile is decided here),
+interactive REPL. Paths are relative to the resource root
 (`res://`-style: `loadText('data/level.json')`).
 
 ```js
-// F6 · C · provisional — signatures final once the asset format is decided (F6)
+// F6 · C · provisional — signatures final once the glTF profile is decided (F6)
 efx.loadText(path)        // → string
 efx.loadImage(path)       // → ImageData
 efx.loadMeshData(path)    // → MeshData
@@ -530,7 +531,10 @@ API for them:
   cataloged. If vision grows this capability, it enters through a future
   change with a `js-api` delta.
 - **Audio** — absent from vision.md. Same treatment as input.
-- **Asset format** — decided in F6; until then `load*` signatures stay
+- **Asset format** — glTF 2.0 is pinned as the import format (meshes,
+  images, skins, animation clips — roadmap F6, data model per ADR 0014);
+  the F6 change settles only the *profile*: .glb vs .gltf container,
+  allowed extensions, image embedding. Until then `load*` signatures stay
   provisional.
 - **Hook registration + `dt` delivery** — target contract (ADR 0016);
   delivered by the next runtime change (F2 at the latest); F1 globals
@@ -539,7 +543,7 @@ API for them:
   constructing a rig procedurally (from `createMeshData` + skeleton data)
   has no path yet. Deferred until a concrete need appears.
 - **Clip naming** — `poseMesh` accepts name or index; the exact clip
-  naming/lookup rules follow the asset format decision (F6).
+  naming/lookup rules follow the glTF profile decision (F6).
 - **Stateful playback helper** — play/pause/blend convenience as pure JS
   over `poseMesh` is an F8-layer candidate, not engine state (ADR 0018).
 - **REPL introspection helpers** — whether the F6 console mode needs extra
