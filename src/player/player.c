@@ -8,6 +8,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#if defined(__EMSCRIPTEN__) && defined(EFX_WEB_GOLDEN)
+#include <emscripten.h>
+#endif
+
 #ifdef _WIN32
 #define EFX_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
 #define EFX_ISREG(m) (((m) & S_IFMT) == S_IFREG)
@@ -187,5 +191,23 @@ int efx_player_main(int argc, char **argv) {
     if (argi >= argc) {
         return usage();
     }
+#if defined(__EMSCRIPTEN__) && defined(EFX_WEB_GOLDEN)
+    {
+        static char rootbuf[160];
+        char scene[64] = "clear";
+        char out[160];
+        EM_ASM({
+            try {
+                const s = new URLSearchParams(location.search).get('scene');
+                if (s !== null) stringToUTF8(s, $0, 64);
+            } catch (e) {}
+        }, scene);
+        snprintf(out, sizeof(out), "/captures/%s.png", scene);
+        snprintf(rootbuf, sizeof(rootbuf), "/goldens/%s", scene);
+        capture.frame = 2;
+        capture.output = out;
+        return run_root_mode(rootbuf, &capture);
+    }
+#endif
     return run_root_mode(argv[argi], capture.frame > 0 ? &capture : NULL);
 }

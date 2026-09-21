@@ -78,13 +78,12 @@ if(EMSCRIPTEN)
     if(EFX_BUILD_GOLDEN_TESTS)
         add_executable(player_web_golden src/main.c src/player/player.c)
         target_link_libraries(player_web_golden PRIVATE efx_core efx_platform)
+        target_compile_definitions(player_web_golden PRIVATE EFX_WEB_GOLDEN=1)
         set_target_properties(player_web_golden PROPERTIES SUFFIX ".js")
         target_link_options(player_web_golden PRIVATE
             -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2
             -sASSERTIONS=1
             -sENVIRONMENT=web
-            "-sEXPORTED_RUNTIME_METHODS=['FS','callMain']"
-            "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web_golden_pre.js"
             "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens@/goldens")
     endif()
 elseif(APPLE)

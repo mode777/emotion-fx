@@ -140,7 +140,24 @@ static void efx_frame_cb(void) {
         uint8_t *px = NULL;
         int w = 0, h = 0;
         if (efx_capture_read_rgba(&px, &w, &h) == 0) {
-            efx_capture_write_png(g_capture.output, w, h, px);
+            if (efx_capture_write_png(g_capture.output, w, h, px) == 0) {
+#if defined(__EMSCRIPTEN__)
+                /* hand the capture to the JS driver as base64 */
+                EM_ASM({
+                    try {
+                        const bytes = FS.readFile(UTF8ToString($0));
+                        let bin = '';
+                        const n = bytes.length;
+                        for (let i = 0; i < n; i++) bin += String.fromCharCode(bytes[i]);
+                        Module['webGoldenCapture'] = btoa(bin);
+                    } catch (e) {
+                        console.error('golden capture export failed:', e);
+                    }
+                }, g_capture.output);
+#endif
+            } else {
+                fprintf(stderr, "player: capture PNG write failed: %s\n", g_capture.output);
+            }
             free(px);
         } else {
             fprintf(stderr, "player: capture readback failed\n");

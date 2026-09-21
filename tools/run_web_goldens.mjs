@@ -106,24 +106,14 @@ for (const scene of scenes) {
     process.stdout.write(`golden_web/${scene}: `);
     await page.goto(`http://localhost:${PORT}/?scene=${scene}`, { waitUntil: 'load' });
     const b64 = await page.evaluate(async (name) => {
-        const M = window.Module;
-        if (typeof M.FS?.readFile !== 'function') {
-            throw new Error('FS missing');
-        }
         for (let i = 0; i < 600; i++) {
-            try {
-                const bytes = M.FS.readFile(`/captures/${name}.png`);
-                let bin = '';
-                for (const b of bytes) bin += String.fromCharCode(b);
-                return btoa(bin);
-            } catch {
-                await new Promise((r) => setTimeout(r, 100));
+            if (window.Module && window.Module['webGoldenCapture']) {
+                return window.Module['webGoldenCapture'];
             }
+            await new Promise((r) => setTimeout(r, 100));
         }
         console.log('[diag] raf ticks:', window.__rafCount,
-            'canvas-webgl2:', !!document.getElementById('canvas').getContext('webgl2'),
-            'module-calls:', typeof Module.callMain, typeof Module._main,
-            'captures dir:', (() => { try { return M.FS.readdir('/captures').join(','); } catch (e) { return 'none: ' + e.message; } })());
+            'webgl2:', !!document.getElementById('canvas').getContext('webgl2'));
         return null;
     }, scene);
 
