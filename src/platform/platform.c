@@ -161,6 +161,7 @@ static void efx_frame_cb(void) {
             try {
                 const c = document.getElementById('canvas');
                 const gli = c.getContext('webgl2');
+                console.log('[gl-err] pending gl error code=' + gli.getError());
                 {
                     const pxs = new Uint8Array(4);
                     gli.readPixels(320, 240, 1, 1, gli.RGBA, gli.UNSIGNED_BYTE, pxs);
