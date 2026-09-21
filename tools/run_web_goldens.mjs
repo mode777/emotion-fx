@@ -112,6 +112,7 @@ for (const scene of scenes) {
             }
             await new Promise((r) => setTimeout(r, 100));
         }
+        return null;
         console.log('[diag] raf ticks:', window.__rafCount,
             'webgl2:', !!document.getElementById('canvas').getContext('webgl2'));
         return null;
