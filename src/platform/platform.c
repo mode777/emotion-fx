@@ -160,13 +160,13 @@ static void efx_frame_cb(void) {
         EM_ASM({
             try {
                 const c = document.getElementById('canvas');
-                const gl = c.getContext('webgl2');
-                gl.clearColor(1, 0, 0, 1);
-                gl.clear(gl.COLOR_BUFFER_BIT);
+                const gli = c.getContext('webgl2');
+                gli.clearColor(1, 0, 0, 1);
+                gli.clear(gli.COLOR_BUFFER_BIT);
                 {
-                    const px = new Uint8Array(4);
-                    gl.readPixels(320, 240, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-                    console.log('[gl-probe] red-clear px=' + px.join(','));
+                    const pxr = new Uint8Array(4);
+                    gli.readPixels(320, 240, 1, 1, gli.RGBA, gli.UNSIGNED_BYTE, pxr);
+                    console.log('[gl-probe] red-clear px=' + pxr.join(','));
                 }
                 const url = c.toDataURL('image/png');
                 Module['webGoldenCapture'] = url.substring(url.indexOf(',') + 1);
