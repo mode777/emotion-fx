@@ -117,7 +117,7 @@ jobs:
           cmake -B build -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
           cmake --build build --target player
 
-      - name: Capture golden images (canonical: Linux llvmpipe)
+      - name: 'Capture golden images (canonical - Linux llvmpipe)'
         run: |
           for scene in clear solid srcrect pivot blend camera; do
             xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 \
