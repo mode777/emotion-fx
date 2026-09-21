@@ -132,10 +132,13 @@ static void efx_frame_cb(void) {
         .action = efx_pass_action(),
         .swapchain = sglue_swapchain(),
     });
+    fprintf(stderr, "efx: trace pass-begin\n");
     efx_pipeline_play();
+    fprintf(stderr, "efx: trace play-done\n");
     sg_end_pass();
 #endif
     sg_commit();
+    fprintf(stderr, "efx: trace commit\n");
     efx_render_end_frame();
 
     if (g_capture.frame > 0 && g_frame >= g_capture.frame) {
