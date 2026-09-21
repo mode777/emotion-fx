@@ -258,6 +258,9 @@ void efx_pipeline_play(void) {
     }
     int run_count = 0;
     const efx_draw_run *runs = efx_render_runs(&run_count);
+#if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: play records=%d runs=%d\n", count, run_count);
+#endif
     if (!runs || run_count <= 0) {
         return;
     }
@@ -303,6 +306,9 @@ void efx_pipeline_play(void) {
         sg_bindings bnd = {0};
         bnd.vertex_buffers[0] = P.vbuf;
         pipe_tex *t = (pipe_tex *)efx_render_texture_native(runs[ri].texture);
+#if defined(__EMSCRIPTEN__)
+        fprintf(stderr, "efx: run %d tex-native=%p\n", ri, (void *)(t ? t->view.id : 0));
+#endif
         if (!t) {
             continue;
         }
