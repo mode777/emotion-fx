@@ -161,13 +161,13 @@ static void efx_frame_cb(void) {
             try {
                 const c = document.getElementById('canvas');
                 const gli = c.getContext('webgl2');
+                {
+                    const pxs = new Uint8Array(4);
+                    gli.readPixels(320, 240, 1, 1, gli.RGBA, gli.UNSIGNED_BYTE, pxs);
+                    console.log('[gl-probe] sokol-content px=' + pxs.join(','));
+                }
                 gli.clearColor(1, 0, 0, 1);
                 gli.clear(gli.COLOR_BUFFER_BIT);
-                {
-                    const pxr = new Uint8Array(4);
-                    gli.readPixels(320, 240, 1, 1, gli.RGBA, gli.UNSIGNED_BYTE, pxr);
-                    console.log('[gl-probe] red-clear px=' + pxr.join(','));
-                }
                 const url = c.toDataURL('image/png');
                 Module['webGoldenCapture'] = url.substring(url.indexOf(',') + 1);
                 const gl = c.getContext('webgl2');
