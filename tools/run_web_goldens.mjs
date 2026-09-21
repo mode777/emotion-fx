@@ -84,8 +84,10 @@ const server = http.createServer((req, res) => {
 await new Promise((r) => server.listen(PORT, r));
 
 const browser = await puppeteer.launch({
+    // chrome-headless-shell (old headless): supports
+    // HeadlessExperimental.beginFrame and continuous rAF (ADR 0020)
     executablePath: process.env.CHROME_PATH || undefined,
-    headless: true,
+    headless: 'shell',
     args: [
         '--no-sandbox',
         '--use-gl=angle',
@@ -105,9 +107,9 @@ const cdp = await page.createCDPSession();
 // one deterministic BeginFrame; rAF callbacks run inside it
 async function beginFrame() {
     try {
-        await cdp.send('HeadlessExperimental.beginFrame', { noDisplayUpdates: true });
+        await cdp.send('HeadlessExperimental.beginFrame', {});
     } catch (e) {
-        // new-headless may need the page visible flag; fall back silently
+        console.log('[beginFrame-error]', e.message);
     }
 }
 

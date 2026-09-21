@@ -94,8 +94,11 @@ jobs:
         with:
           chrome-version: '131'
 
-      - name: Install puppeteer-core
-        run: npm install --no-save puppeteer-core
+      - name: Install driver dependencies + headless shell
+        run: |
+          npm install --no-save puppeteer-core @puppeteer/browsers
+          npx @puppeteer/browsers install chrome-headless-shell@stable --path "$HOME/browsers"
+          echo "CHROME_PATH=$(find "$HOME/browsers" -name chrome-headless-shell -type f | head -1)" >> "$GITHUB_ENV"
 
       - name: Golden tests via headless Chrome (SwiftShader WebGL)
         run: node tools/run_web_goldens.mjs
