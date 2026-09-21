@@ -65,17 +65,29 @@ int efx_player_frame(void *ud) {
     if (efx_runtime_quit_requested(rt) || efx_runtime_in_error(rt)) {
         return 1;
     }
+#if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: t3c pre-update\n");
+#endif
     int r = efx_runtime_call_hook(rt, 1);
     if (r != EFX_HOOK_OK) {
         return 1;
     }
+#if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: t3d update-done\n");
+#endif
     if (efx_runtime_quit_requested(rt) || efx_runtime_in_error(rt)) {
         return 1;
     }
+#if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: t3e pre-render\n");
+#endif
     r = efx_runtime_call_hook(rt, 0);
     if (r != EFX_HOOK_OK) {
         return 1;
     }
+#if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: t3f render-done\n");
+#endif
     /* frame-end collection: unreferenced native resources are finalized
        within roughly a frame (js-api resource lifecycle rules) */
     efx_runtime_collect(rt);
