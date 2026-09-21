@@ -25,20 +25,20 @@ requirements live in the delta specs (`2d-layer`, `verification`).
 
 ## 4. 2D canned pipeline (sokol playback)
 
-- [ ] 4.1 Implement the engine-owned 2D shader and three blend pipeline variants (D2, ADR 0015), quad vertex generation from records (frame→NDC stretch, y-down flip), and playback into the sokol pass; verify manually on the host with a scratch scene (textured quad + tint + rotation) before any golden exists
-- [ ] 4.2 Route blend-variant selection and clear color through playback state; verify manually that alpha/additive/subtractive scenes differ visibly and clear color applies
+- [x] 4.1 Implement the engine-owned 2D shader and three blend pipeline variants (D2, ADR 0015), quad vertex generation from records (frame→NDC stretch, y-down flip), and playback into the sokol pass; verify manually on the host with a scratch scene (textured quad + tint + rotation) before any golden exists
+- [x] 4.2 Route blend-variant selection and clear color through playback state; verify manually that alpha/additive/subtractive scenes differ visibly and clear color applies
 
 ## 5. Capture run mode and readback (D7)
 
-- [ ] 5.1 Add `--capture-frame <N> --capture-output <file>` to the player run modes: render N frames, read back, write PNG via stb (with row-order handling), exit 0; verify on the host that a fixture capture produces a 640×480 PNG whose corner pixels match the scene
+- [x] 5.1 Add `--capture-frame <N> --capture-output <file>` to the player run modes: render N frames, read back, write PNG via stb (with row-order handling), exit 0; verify on the host that a fixture capture produces a 640×480 PNG whose corner pixels match the scene
 - [ ] 5.2 Implement per-backend readback behind the platform layer: GL `glReadPixels` (Linux/macOS) and D3D11 staging copy + map (Windows); verify GL path on the host and the D3D11 path via the CI Windows job in task 7.1
 - [ ] 5.3 Implement the Emscripten capture path (WebGL2 readPixels → MEMFS → PNG); verify the build compiles and a Node-driven run produces a capture buffer
 
 ## 6. Golden harness and scenes (D8)
 
 - [x] 6.1 Implement the comparator helper (per-channel Δ ≤ 2/255, ≥ 99.5% pixels, writes `{test}-actual.png` + `{test}-diff.png`, names the test, exits non-zero); verify by forcing a mismatch and confirming artifacts + non-zero exit, then a matching pair exits 0
-- [ ] 6.2 Author deterministic golden scenes as resource roots (clear color; white-texture solid rect + tint; sourceRect atlas strip; rotation/scale pivot; blending trio; camera zoom/rotation about center) driven by F1 global hooks, and commit their goldens via the documented regeneration invocation; verify `ctest` golden tests pass on the host
-- [ ] 6.3 Wire golden tests and the display-list unit tests into ctest (all build targets); verify `ctest` on the host runs smoke + unit + golden suites green
+- [x] 6.2 Author deterministic golden scenes as resource roots (clear color; white-texture solid rect + tint; sourceRect atlas strip; rotation/scale pivot; blending trio; camera zoom/rotation about center) driven by F1 global hooks, and commit their goldens via the documented regeneration invocation; verify `ctest` golden tests pass on the host
+- [x] 6.3 Wire golden tests and the display-list unit tests into ctest (all build targets); verify `ctest` on the host runs smoke + unit + golden suites green
 
 ## 7. CI determinism (D9)
 
