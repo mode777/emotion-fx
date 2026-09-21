@@ -88,7 +88,9 @@ static void efx_capture_setup(void) {
 
 static void efx_init_cb(void) {
     fprintf(stderr, "efx: t1 pre-sg\n");
-    sg_setup(&(sg_desc){0});
+    sg_setup(&(sg_desc){
+        .environment = sglue_environment(),
+    });
     fprintf(stderr, "efx: t2 sg ok\n");
     efx_pipeline_install();
     fprintf(stderr, "efx: t3 pipe ok\n");
