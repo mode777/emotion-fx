@@ -34,6 +34,11 @@ const PORT = 18123;
 const PAGE_HTML = `<!doctype html>
 <html><head><meta charset="utf-8"><title>efx golden capture</title></head>
 <body><canvas id="canvas" width="640" height="480"></canvas>
+<script>
+window.__rafCount = 0;
+const __raf = window.requestAnimationFrame.bind(window);
+window.requestAnimationFrame = (cb) => { window.__rafCount++; return __raf(cb); };
+</script>
 <script src="/player_web_golden.js"></script></body></html>`;
 
 const scenes = fs
@@ -75,6 +80,9 @@ const browser = await puppeteer.launch({
         '--use-angle=swiftshader',
         '--enable-unsafe-swiftshader',
         '--disable-gpu-sandbox',
+        '--disable-background-timer-throttling',
+        '--disable-renderer-backgrounding',
+        '--disable-backgrounding-occluded-windows',
     ],
 });
 const page = await browser.newPage();
@@ -107,6 +115,9 @@ for (const scene of scenes) {
                 await new Promise((r) => setTimeout(r, 100));
             }
         }
+        console.log('[diag] raf ticks:', window.__rafCount,
+            'canvas:', !!document.getElementById('canvas'),
+            'webgl:', !!document.createElement('canvas').getContext('webgl2'));
         return null;
     }, scene);
 
