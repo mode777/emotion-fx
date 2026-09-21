@@ -42,6 +42,13 @@ jobs:
         if: runner.os != 'Linux'
         run: ctest --test-dir build -C Release --output-on-failure
 
+      - name: Upload golden failure artifacts
+        if: failure() && runner.os != 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failures-${{ matrix.os }}
+          path: build/goldens/
+
   emscripten:
     name: build+test (emscripten)
     runs-on: ubuntu-latest

@@ -71,7 +71,9 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
         return -1;
     }
     ID3D11Texture2D *back = NULL;
-    if (FAILED(sc->lpVtbl->GetBuffer(sc, 0, &IID_ID3D11Texture2D, (void **)&back))) {
+    HRESULT hr = sc->lpVtbl->GetBuffer(sc, 0, &IID_ID3D11Texture2D, (void **)&back);
+    if (FAILED(hr)) {
+        fprintf(stderr, "capture: GetBuffer failed hr=0x%08lx\n", (unsigned long)hr);
         return -1;
     }
     D3D11_TEXTURE2D_DESC bd;
@@ -86,12 +88,14 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     sd.SampleDesc.Quality = 0;
     ID3D11Texture2D *staging = NULL;
     if (FAILED(dev->lpVtbl->CreateTexture2D(dev, &sd, NULL, &staging))) {
+        fprintf(stderr, "capture: CreateTexture2D staging failed\n");
         back->lpVtbl->Release(back);
         return -1;
     }
     ctx->lpVtbl->CopyResource(ctx, (ID3D11Resource *)staging, (ID3D11Resource *)back);
     D3D11_MAPPED_SUBRESOURCE map;
     if (FAILED(ctx->lpVtbl->Map(ctx, (ID3D11Resource *)staging, 0, D3D11_MAP_READ, 0, &map))) {
+        fprintf(stderr, "capture: Map failed\n");
         staging->lpVtbl->Release(staging);
         back->lpVtbl->Release(back);
         return -1;
@@ -156,12 +160,7 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     }
     [g_capture_tex getBytes:px bytesPerRow:(NSUInteger)w * 4
                  fromRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0];
-    /* BGRA -> RGBA (texture rows are already top-down) */
-    for (int i = 0; i < w * h; i++) {
-        uint8_t t = px[i * 4 + 0];
-        px[i * 4 + 0] = px[i * 4 + 2];
-        px[i * 4 + 2] = t;
-    }
+    /* MTLPixelFormatRGBA8Unorm: bytes are already RGBA, top-down */
     *out_pixels = px;
     *out_w = w;
     *out_h = h;
