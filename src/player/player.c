@@ -150,6 +150,26 @@ static int run_root_mode(const char *root, const efx_platform_capture *capture) 
 }
 
 int efx_player_main(int argc, char **argv) {
+#if defined(__EMSCRIPTEN__) && defined(EFX_WEB_GOLDEN)
+    {
+        static char rootbuf[160];
+        static char outbuf[160];
+        char scene[64] = "clear";
+        EM_ASM({
+            try {
+                const s = new URLSearchParams(location.search).get('scene');
+                if (s !== null) stringToUTF8(s, $0, 64);
+            } catch (e) {}
+        }, scene);
+        snprintf(outbuf, sizeof(outbuf), "/captures/%s.png", scene);
+        snprintf(rootbuf, sizeof(rootbuf), "/goldens/%s", scene);
+        efx_platform_capture capture;
+        memset(&capture, 0, sizeof(capture));
+        capture.frame = 2;
+        capture.output = outbuf;
+        return run_root_mode(rootbuf, &capture);
+    }
+#endif
     if (argc < 2) {
         return usage();
     }
@@ -188,24 +208,6 @@ int efx_player_main(int argc, char **argv) {
         fprintf(stderr, "player: --capture-frame and --capture-output go together\n");
         return usage();
     }
-#if defined(__EMSCRIPTEN__) && defined(EFX_WEB_GOLDEN)
-    {
-        static char rootbuf[160];
-        char scene[64] = "clear";
-        char out[160];
-        EM_ASM({
-            try {
-                const s = new URLSearchParams(location.search).get('scene');
-                if (s !== null) stringToUTF8(s, $0, 64);
-            } catch (e) {}
-        }, scene);
-        snprintf(out, sizeof(out), "/captures/%s.png", scene);
-        snprintf(rootbuf, sizeof(rootbuf), "/goldens/%s", scene);
-        capture.frame = 2;
-        capture.output = out;
-        return run_root_mode(rootbuf, &capture);
-    }
-#endif
     if (argi >= argc) {
         return usage();
     }
