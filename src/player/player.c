@@ -169,12 +169,11 @@ int efx_player_main(int argc, char **argv) {
         static char rootbuf[160];
         static char outbuf[160];
         char scene[64] = "clear";
-        EM_ASM({
-            try {
-                const s = new URLSearchParams(location.search).get('scene');
-                if (s !== null) stringToUTF8(s, $0, 64);
-            } catch (e) {}
-        }, scene);
+        {
+            const char *s = emscripten_run_script_string(
+                "(function(){ try { return new URLSearchParams(location.search).get('scene') || 'clear'; } catch (e) { return 'clear'; } })()");
+            snprintf(scene, sizeof(scene), "%s", s ? s : "clear");
+        }
         snprintf(outbuf, sizeof(outbuf), "/captures/%s.png", scene);
         snprintf(rootbuf, sizeof(rootbuf), "/goldens/%s", scene);
         efx_platform_capture capture;
