@@ -6,6 +6,7 @@
  * file only reads back that texture via the blit path.
  */
 #include "platform/capture.h"
+#include "platform/backend.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +30,13 @@ static void flip_rows(uint8_t *px, int w, int h) {
     free(row);
 }
 
-#include "sokol_app.h" /* brings the GL headers */
+#define GL_GLEXT_PROTOTYPES
+#if defined(SOKOL_GLCORE)
+#include <GL/gl.h>
+#elif defined(SOKOL_GLES3)
+#include <GLES3/gl3.h>
+#endif
+#include "sokol_app.h" /* sapp_width/height */
 
 int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     int w = sapp_width();
