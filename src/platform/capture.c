@@ -1,9 +1,8 @@
 /*
  * Frame capture: per-backend framebuffer readback + PNG encode (D7/D8).
- * GL backends read the default framebuffer; D3D11 copies the swapchain
- * back buffer into a staging texture; Metal renders nothing special here
- * (the capture pass targets an injected texture — see platform.c) and this
- * file only reads back that texture via the blit path.
+ * Native desktop backends read back here; the Emscripten build captures
+ * via canvas.toDataURL in platform.c instead (native readPixels crashes
+ * headless shells with SwiftShader).
  */
 #include "platform/capture.h"
 #include "platform/backend.h"
@@ -15,11 +14,12 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#if defined(SOKOL_GLCORE) || defined(SOKOL_GLES3)
-
 static void flip_rows(uint8_t *px, int w, int h) {
     const int stride = w * 4;
     uint8_t *row = malloc((size_t)stride);
+    if (!row) {
+        return;
+    }
     for (int y = 0; y < h / 2; y++) {
         uint8_t *a = px + (size_t)y * stride;
         uint8_t *b = px + (size_t)(h - 1 - y) * stride;
@@ -30,12 +30,10 @@ static void flip_rows(uint8_t *px, int w, int h) {
     free(row);
 }
 
-#define GL_GLEXT_PROTOTYPES
 #if defined(SOKOL_GLCORE)
+
+#define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
-#elif defined(SOKOL_GLES3)
-#include <GLES3/gl3.h>
-#endif
 #include "sokol_app.h" /* sapp_width/height */
 
 int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
@@ -171,10 +169,12 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
 }
 
 #else
+
 int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     (void)out_pixels; (void)out_w; (void)out_h;
     return -1;
 }
+
 #endif
 
 int efx_capture_write_png(const char *path, int w, int h, const uint8_t *rgba) {

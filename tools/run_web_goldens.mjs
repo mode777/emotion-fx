@@ -97,6 +97,8 @@ const browser = await puppeteer.launch({
         '--disable-background-timer-throttling',
         '--disable-renderer-backgrounding',
         '--disable-backgrounding-occluded-windows',
+        '--enable-begin-frame-control',
+        '--run-all-compositor-stages-before-draw',
     ],
 });
 const page = await browser.newPage();

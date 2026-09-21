@@ -136,26 +136,26 @@ static void efx_frame_cb(void) {
     sg_commit();
     efx_render_end_frame();
 
+#if defined(__EMSCRIPTEN__)
+    if (g_capture.frame > 0 && g_frame >= g_capture.frame) {
+        /* web: read back via canvas.toDataURL (native glReadPixels from the
+           default framebuffer crashes headless shells with SwiftShader) */
+        EM_ASM({
+            try {
+                const url = document.getElementById('canvas').toDataURL('image/png');
+                Module['webGoldenCapture'] = url.substring(url.indexOf(',') + 1);
+            } catch (e) {
+                console.error('golden capture export failed:', e);
+            }
+        });
+        sapp_quit();
+    }
+#else
     if (g_capture.frame > 0 && g_frame >= g_capture.frame) {
         uint8_t *px = NULL;
         int w = 0, h = 0;
         if (efx_capture_read_rgba(&px, &w, &h) == 0) {
-            if (efx_capture_write_png(g_capture.output, w, h, px) == 0) {
-#if defined(__EMSCRIPTEN__)
-                /* hand the capture to the JS driver as base64 */
-                EM_ASM({
-                    try {
-                        const bytes = FS.readFile(UTF8ToString($0));
-                        let bin = '';
-                        const n = bytes.length;
-                        for (let i = 0; i < n; i++) bin += String.fromCharCode(bytes[i]);
-                        Module['webGoldenCapture'] = btoa(bin);
-                    } catch (e) {
-                        console.error('golden capture export failed:', e);
-                    }
-                }, g_capture.output);
-#endif
-            } else {
+            if (efx_capture_write_png(g_capture.output, w, h, px) != 0) {
                 fprintf(stderr, "player: capture PNG write failed: %s\n", g_capture.output);
             }
             free(px);
@@ -164,6 +164,7 @@ static void efx_frame_cb(void) {
         }
         sapp_quit();
     }
+#endif
 }
 
 static void efx_cleanup_cb(void) {
@@ -197,6 +198,11 @@ int efx_platform_run(const efx_platform_desc *desc, efx_frame_hooks hooks) {
         d.height = EFX_CAP_H;
     }
     d.window_title = "EmotionFX";
+#if defined(__EMSCRIPTEN__)
+    if (g_capture.frame > 0) {
+        d.html5.preserve_drawing_buffer = true; /* canvas readback after commit */
+    }
+#endif
     sapp_run(&d);
     return 0;
 }
