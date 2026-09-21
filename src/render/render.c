@@ -12,6 +12,8 @@
 
 /* ---------------------------------------------------------------- state */
 
+static void flush_pending_uploads(void);
+
 typedef struct {
     int used;
     int alive;
@@ -19,6 +21,7 @@ typedef struct {
     uint32_t gen;
     int w, h;
     void *native;
+    uint8_t *pending; /* RGBA bytes queued before a sink existed */
 } tex_slot;
 
 static struct {
@@ -41,6 +44,7 @@ static struct {
 void efx_render_install_sink(const efx_render_sink *sink) {
     R.sink = sink;
     efx_render_reset_state();
+    flush_pending_uploads();
 }
 
 void efx_render_set_viewport(int w, int h) {
@@ -109,9 +113,48 @@ static tex_slot *slot_get(uint64_t h) {
     return s;
 }
 
+static void flush_pending_uploads(void) {
+    if (!R.sink || !R.sink->create_texture) {
+        return;
+    }
+    for (int i = 0; i < R.slot_count; i++) {
+        tex_slot *s = &R.slots[i];
+        if (s->used && s->alive && !s->native && s->pending) {
+            s->native = R.sink->create_texture(R.sink->ud, s->w, s->h, s->pending);
+            free(s->pending);
+            s->pending = NULL;
+        }
+    }
+}
+
 uint64_t efx_render_texture_create(int w, int h, const uint8_t *rgba) {
     if (!R.sink || !R.sink->create_texture) {
-        return 0;
+        /* no GPU surface yet: queue the upload (top-level main.js code) */
+        int idx = -1;
+        if (R.slot_count >= R.slot_cap) {
+            int cap = R.slot_cap ? R.slot_cap * 2 : 64;
+            tex_slot *grown = realloc(R.slots, (size_t)cap * sizeof(tex_slot));
+            if (!grown) {
+                return 0;
+            }
+            R.slots = grown;
+            R.slot_cap = cap;
+        }
+        tex_slot *s = &R.slots[R.slot_count];
+        s->pending = malloc((size_t)w * h * 4);
+        if (!s->pending) {
+            return 0;
+        }
+        memcpy(s->pending, rgba, (size_t)w * h * 4);
+        s->used = 1;
+        s->alive = 1;
+        s->permanent = 0;
+        s->gen++;
+        s->w = w;
+        s->h = h;
+        s->native = NULL;
+        idx = R.slot_count++;
+        return ((uint64_t)s->gen << 32) | (uint64_t)(idx + 1);
     }
     void *native = R.sink->create_texture(R.sink->ud, w, h, rgba);
     if (!native) {
@@ -146,6 +189,7 @@ uint64_t efx_render_texture_create(int w, int h, const uint8_t *rgba) {
     s->w = w;
     s->h = h;
     s->native = native;
+    s->pending = NULL;
     uint32_t idx = (uint32_t)(s - R.slots) + 1;
     return ((uint64_t)s->gen << 32) | (uint64_t)idx;
 }
@@ -162,6 +206,12 @@ static int texture_release(uint64_t h, tex_slot **out_slot) {
         return EFX_RENDER_OK; /* destroy() is idempotent */
     }
     s->alive = 0;
+    if (s->pending) {
+        /* upload never happened; nothing to defer */
+        free(s->pending);
+        s->pending = NULL;
+        return EFX_RENDER_OK;
+    }
     /* deferred texture destroys: entries are slot indexes; native release
        happens at end of frame (records may reference the texture until
        playback finishes — js-api resource lifecycle rules) */
@@ -421,6 +471,7 @@ void efx_render_shutdown(void) {
             if (R.slots[i].used && R.slots[i].native) {
                 R.sink->destroy_texture(R.sink->ud, R.slots[i].native);
             }
+            free(R.slots[i].pending);
         }
         if (R.sink->shutdown) {
             R.sink->shutdown(R.sink->ud);

@@ -72,7 +72,8 @@ typedef struct efx_render_sink {
     void (*shutdown)(void *ud);
 } efx_render_sink;
 
-/* lifecycle */
+/* lifecycle; installing the sink flushes any texture uploads queued
+   before a GPU surface existed (top-level createTexture in main.js) */
 void efx_render_install_sink(const efx_render_sink *sink);
 void efx_render_shutdown(void);
 void efx_render_set_viewport(int w, int h);
