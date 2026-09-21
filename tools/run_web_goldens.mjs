@@ -100,6 +100,16 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 page.on('console', (m) => console.log('[chrome]', m.text()));
 page.on('pageerror', (e) => console.error('[pageerror]', e.message));
+const cdp = await page.createCDPSession();
+
+// one deterministic BeginFrame; rAF callbacks run inside it
+async function beginFrame() {
+    try {
+        await cdp.send('HeadlessExperimental.beginFrame', { noDisplayUpdates: true });
+    } catch (e) {
+        // new-headless may need the page visible flag; fall back silently
+    }
+}
 
 let failures = 0;
 for (const scene of scenes) {
