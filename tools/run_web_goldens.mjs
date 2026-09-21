@@ -34,6 +34,10 @@ const PORT = 18123;
 const PAGE_HTML = `<!doctype html>
 <html><head><meta charset="utf-8"><title>efx golden capture</title></head>
 <body><canvas id="canvas" width="640" height="480"></canvas>
+<!-- keep the compositor producing BeginFrames in headless so rAF (and the
+     emscripten main loop) keeps ticking; DOM is not part of the GL readback -->
+<style>@keyframes k { from { transform: translateY(0); } to { transform: translateY(1px); } }</style>
+<div style="position:fixed;width:1px;height:1px;background:#123;animation:k 0.016s linear infinite alternate;"></div>
 <script>
 window.__rafCount = 0;
 const __raf = window.requestAnimationFrame.bind(window);
