@@ -159,8 +159,16 @@ static void efx_frame_cb(void) {
            default framebuffer crashes headless shells with SwiftShader) */
         EM_ASM({
             try {
-                const url = document.getElementById('canvas').toDataURL('image/png');
+                const c = document.getElementById('canvas');
+                const url = c.toDataURL('image/png');
                 Module['webGoldenCapture'] = url.substring(url.indexOf(',') + 1);
+                const gl = c.getContext('webgl2');
+                if (gl) {
+                    const px = new Uint8Array(4);
+                    gl.readPixels(320, 240, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+                    console.log('[capture-probe] in-frame px=' + px.join(',') +
+                        ' err=' + gl.getError() + ' ctxLoss=' + gl.isContextLost());
+                }
             } catch (e) {
                 console.error('golden capture export failed:', e);
             }
