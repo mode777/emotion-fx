@@ -7,6 +7,7 @@
 #include "platform/backend.h"
 #include "render/render.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
