@@ -45,18 +45,21 @@ if (scenes.length === 0) {
 }
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
+const MIME = { '.wasm': 'application/wasm', '.js': 'text/javascript', '.data': 'application/octet-stream' };
 const server = http.createServer((req, res) => {
     if (req.url === '/' || req.url.startsWith('/?')) {
         res.setHeader('Content-Type', 'text/html');
         res.end(PAGE_HTML);
         return;
     }
-    const p = path.join(BUILD, req.url.slice(1));
+    const p = path.join(BUILD, decodeURIComponent(req.url.split('?')[0].slice(1)));
     try {
         const data = fs.readFileSync(p);
-        res.setHeader('Content-Type', p.endsWith('.wasm') ? 'application/wasm' : 'text/html');
+        res.setHeader('Content-Type', MIME[path.extname(p)] ?? 'application/octet-stream');
+        console.log('[serve]', req.url, data.length, 'bytes');
         res.end(data);
     } catch {
+        console.log('[serve] 404:', req.url);
         res.statusCode = 404;
         res.end('nope');
     }

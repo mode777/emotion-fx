@@ -72,7 +72,7 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
         return -1;
     }
     ID3D11Texture2D *back = NULL;
-    if (FAILED(sc->lpVtbl->GetBuffer(sc, 0, __uuidof(ID3D11Texture2D), (void **)&back))) {
+    if (FAILED(sc->lpVtbl->GetBuffer(sc, 0, &IID_ID3D11Texture2D, (void **)&back))) {
         return -1;
     }
     D3D11_TEXTURE2D_DESC bd;

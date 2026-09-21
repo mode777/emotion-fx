@@ -75,7 +75,9 @@ jobs:
         run: emcmake cmake -B build-web-golden -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 
       - name: Build capture player
-        run: cmake --build build-web-golden --target player_web_golden
+        run: |
+          cmake --build build-web-golden --target player_web_golden
+          ls -la build-web-golden
 
       - name: Configure native tools
         run: |
