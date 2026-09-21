@@ -57,6 +57,8 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
 
 #elif defined(SOKOL_D3D11)
 
+#include <d3d11.h>
+#include <dxgi.h>
 #include "sokol_app.h"
 
 int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
