@@ -188,9 +188,6 @@ int efx_player_main(int argc, char **argv) {
         fprintf(stderr, "player: --capture-frame and --capture-output go together\n");
         return usage();
     }
-    if (argi >= argc) {
-        return usage();
-    }
 #if defined(__EMSCRIPTEN__) && defined(EFX_WEB_GOLDEN)
     {
         static char rootbuf[160];
@@ -209,5 +206,8 @@ int efx_player_main(int argc, char **argv) {
         return run_root_mode(rootbuf, &capture);
     }
 #endif
+    if (argi >= argc) {
+        return usage();
+    }
     return run_root_mode(argv[argi], capture.frame > 0 ? &capture : NULL);
 }
