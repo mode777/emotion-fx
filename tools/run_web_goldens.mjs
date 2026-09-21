@@ -45,7 +45,7 @@ window.requestAnimationFrame = (cb) => {
     window.__rafCount++;
     if (window.__rafCount <= 3) console.log('[raf] tick ' + window.__rafCount);
     return __raf((t) => {
-        try { cb(t); } catch (e) { console.log('[raf-cb-throw]', e && (e.message || e)); throw e; }
+        try { cb(t); } catch (e) { console.log('[raf-cb-throw]', e && (e.message || e), '\n', e && e.stack); throw e; }
     });
 };
 window.addEventListener('unhandledrejection', (e) => console.log('[rejection]', e.reason && (e.reason.message || e.reason)));
