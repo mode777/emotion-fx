@@ -98,9 +98,15 @@ static void efx_init_cb(void) {
 
 static void efx_frame_cb(void) {
     g_frame++;
+#if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: frame %d\n", g_frame);
+#endif
     efx_render_begin_frame();
     efx_render_set_viewport(sapp_width(), sapp_height());
     if (g_hooks.on_frame && g_hooks.on_frame(g_hooks.ud)) {
+#if defined(__EMSCRIPTEN__)
+        fprintf(stderr, "efx: hooks stop\n");
+#endif
         sapp_quit();
         return;
     }
@@ -137,6 +143,7 @@ static void efx_frame_cb(void) {
     efx_render_end_frame();
 
 #if defined(__EMSCRIPTEN__)
+    fprintf(stderr, "efx: frame-end capture=%d gf=%d\n", g_capture.frame, g_frame);
     if (g_capture.frame > 0 && g_frame >= g_capture.frame) {
         /* web: read back via canvas.toDataURL (native glReadPixels from the
            default framebuffer crashes headless shells with SwiftShader) */
