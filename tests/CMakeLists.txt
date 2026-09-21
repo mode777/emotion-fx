@@ -43,16 +43,6 @@ function(add_unit_test TARGET CASE)
     endif()
 endfunction()
 
-function(unit_test_target_props TARGET)
-    if(UNIX)
-        target_link_libraries(${TARGET} PRIVATE m)
-    endif()
-    if(EMSCRIPTEN)
-        # record-budget tests grow past the default 16 MB heap
-        target_link_options(${TARGET} PRIVATE -sALLOW_MEMORY_GROWTH=1)
-    endif()
-endfunction()
-
 foreach(CASE
     compose_camera compose_quad value_snapshot default_camera_viewport
     blend_snapshot record_budget texture_lifecycle record_fields batching)

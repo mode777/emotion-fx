@@ -35,6 +35,7 @@ static int g_frame;
 /* capture pass renders into an injected Managed texture instead of the
    framebuffer-only swapchain drawable */
 static sg_image g_cap_img;
+static sg_view g_cap_view;
 static sg_attachments g_cap_atts;
 static void *g_cap_mtl;
 static int g_cap_active;
@@ -76,9 +77,11 @@ static void efx_capture_setup(void) {
         .usage.color_attachment = true,
         .mtl_textures[0] = g_cap_mtl,
     });
-    g_cap_atts = sg_make_attachments(&(sg_attachments_desc){
-        .colors[0] = {.color_attachment.image = g_cap_img},
+    g_cap_view = sg_make_view(&(sg_view_desc){
+        .color_attachment.image = g_cap_img,
     });
+    memset(&g_cap_atts, 0, sizeof(g_cap_atts));
+    g_cap_atts.colors[0] = g_cap_view;
     g_cap_active = 1;
 }
 #endif
@@ -185,7 +188,7 @@ void efx_platform_shutdown(void) {
     efx_pipeline_shutdown();
 #ifdef SOKOL_METAL
     if (g_cap_active) {
-        sg_destroy_attachments(g_cap_atts);
+        sg_destroy_view(g_cap_view);
         sg_destroy_image(g_cap_img);
         g_cap_active = 0;
     }
