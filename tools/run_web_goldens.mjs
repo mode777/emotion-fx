@@ -94,9 +94,6 @@ const browser = await puppeteer.launch({
         '--use-angle=swiftshader',
         '--enable-unsafe-swiftshader',
         '--disable-gpu-sandbox',
-        '--disable-background-timer-throttling',
-        '--disable-renderer-backgrounding',
-        '--disable-backgrounding-occluded-windows',
         '--enable-begin-frame-control',
         '--run-all-compositor-stages-before-draw',
     ],
@@ -119,19 +116,15 @@ let failures = 0;
 for (const scene of scenes) {
     process.stdout.write(`golden_web/${scene}: `);
     await page.goto(`http://localhost:${PORT}/?scene=${scene}`, { waitUntil: 'load' });
-    const b64 = await page.evaluate(async (name) => {
-        for (let i = 0; i < 600; i++) {
-            if (window.Module && window.Module['webGoldenCapture']) {
-                return window.Module['webGoldenCapture'];
-            }
-            await new Promise((r) => setTimeout(r, 100));
+    // headless shell fires rAF only inside explicit BeginFrames, so the
+    // driver drives the frame loop until the capture appears (frame 2)
+    let b64 = null;
+    for (let i = 0; i < 60 && !b64; i++) {
+        b64 = await page.evaluate(() => window.Module?.['webGoldenCapture'] ?? null);
+        if (!b64) {
+            await beginFrame();
         }
-        return null;
-        console.log('[diag] raf ticks:', window.__rafCount,
-            'webgl2:', !!document.getElementById('canvas').getContext('webgl2'));
-        return null;
-    }, scene);
-
+    }
     if (!b64) {
         console.log('FAIL (capture timed out)');
         failures++;
