@@ -86,7 +86,7 @@ await new Promise((r) => server.listen(PORT, r));
 const browser = await puppeteer.launch({
     // chrome-headless-shell (old headless): supports
     // HeadlessExperimental.beginFrame and continuous rAF (ADR 0020)
-    executablePath: process.env.CHROME_PATH || undefined,
+    executablePath: process.env.CHROME_SHELL_PATH || process.env.CHROME_PATH || undefined,
     headless: 'shell',
     args: [
         '--no-sandbox',
