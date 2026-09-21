@@ -106,7 +106,7 @@ static void efx_frame_cb(void) {
 #endif
     efx_render_begin_frame();
     efx_render_set_viewport(sapp_width(), sapp_height());
-    fprintf(stderr, 'efx: t3b pre-hooks\n');
+    fprintf(stderr, "efx: t3b pre-hooks\n");
     if (g_hooks.on_frame && g_hooks.on_frame(g_hooks.ud)) {
 #if defined(__EMSCRIPTEN__)
     
