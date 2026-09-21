@@ -52,6 +52,25 @@ void efx_render_set_viewport(int w, int h) {
     R.viewport_h = h;
 }
 
+/* documented defaults apply once, lazily — the script configures state
+   at eval time, before the GPU sink exists, and installing the sink must
+   not wipe that configuration */
+static int state_ready;
+static void default_camera(efx_camera2d *cam);
+
+static void ensure_state(void) {
+    if (state_ready) {
+        return;
+    }
+    default_camera(&R.camera);
+    R.clear_color[0] = 0.0f;
+    R.clear_color[1] = 0.0f;
+    R.clear_color[2] = 0.0f;
+    R.clear_color[3] = 1.0f;
+    R.blend = EFX_BLEND_ALPHA;
+    state_ready = 1;
+}
+
 static void default_camera(efx_camera2d *cam) {
     cam->frame_w = 0.0f;
     cam->frame_h = 0.0f;
@@ -71,12 +90,14 @@ void efx_render_reset_state(void) {
 }
 
 void efx_render_set_camera(const efx_camera2d *cam) {
+    ensure_state();
     if (cam) {
         R.camera = *cam;
     }
 }
 
 void efx_render_set_clear_color(const float rgba[4]) {
+    ensure_state();
     if (rgba) {
         for (int i = 0; i < 4; i++) {
             R.clear_color[i] = rgba[i];
@@ -85,12 +106,14 @@ void efx_render_set_clear_color(const float rgba[4]) {
 }
 
 void efx_render_clear_color(float out_rgba[4]) {
+    ensure_state();
     for (int i = 0; i < 4; i++) {
         out_rgba[i] = R.clear_color[i];
     }
 }
 
 int efx_render_set_blend(int mode) {
+    ensure_state();
     if (mode < EFX_BLEND_ALPHA || mode > EFX_BLEND_SUBTRACTIVE) {
         return -1;
     }
@@ -349,6 +372,7 @@ static int record_push(efx_quad_record rec) {
 int efx_render_quad(float x, float y, float w, float h, uint64_t texture,
                     const float color[4], float rotation_deg, float scale,
                     const float src_rect[4], int has_src) {
+    ensure_state();
     float fw = R.camera.frame_w > 0.0f ? R.camera.frame_w
                                        : (float)(R.viewport_w ? R.viewport_w : 640);
     float fh = R.camera.frame_h > 0.0f ? R.camera.frame_h
@@ -447,6 +471,7 @@ const efx_draw_run *efx_render_runs(int *count) {
 }
 
 void efx_render_begin_frame(void) {
+    ensure_state();
     R.record_count = 0;
     R.record_bytes = 0;
 }
@@ -481,4 +506,5 @@ void efx_render_shutdown(void) {
     free(R.records);
     free(R.deferred);
     memset(&R, 0, sizeof(R));
+    state_ready = 0;
 }
