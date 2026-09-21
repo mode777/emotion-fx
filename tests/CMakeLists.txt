@@ -58,27 +58,30 @@ endforeach()
 # running window system) — Emscripten goldens run through the browser job
 option(EFX_BUILD_GOLDEN_TESTS "Build/run golden-image capture tests" OFF)
 if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN)
+    # embeds stb implementations -> relaxed warnings for this tool
     add_executable(efx_imgdiff imgdiff.c)
     target_include_directories(efx_imgdiff PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/stb)
     if(MSVC)
-        target_compile_options(efx_imgdiff PRIVATE /W4 /WX)
+        target_compile_options(efx_imgdiff PRIVATE /W3)
     else()
-        target_compile_options(efx_imgdiff PRIVATE -Wall -Wextra -Werror)
+        target_compile_options(efx_imgdiff PRIVATE -Wall -Wno-unused-function)
     endif()
 
-    function(add_golden_test NAME)
-        add_test(NAME golden_${NAME}
-            COMMAND ${CMAKE_COMMAND}
-                -DGOLDEN_NAME=${NAME}
-                -DGOLDEN_PLAYER=$<TARGET_FILE:player>
-                -DGOLDEN_IMGDIFF=$<TARGET_FILE:efx_imgdiff>
-                -DGOLDEN_SCENE=${CMAKE_CURRENT_SOURCE_DIR}/goldens/${NAME}
-                -DBINARY_DIR=${CMAKE_BINARY_DIR}
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/run_golden.cmake)
-    endfunction()
-
+    # a scene's test activates once its golden image is committed (the
+    # golden bootstrap produces them via the manual workflow job)
     foreach(SCENE clear solid srcrect pivot blend camera)
-        add_golden_test(${SCENE})
+        if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/goldens/${SCENE}/golden.png)
+            add_test(NAME golden_${SCENE}
+                COMMAND ${CMAKE_COMMAND}
+                    -DGOLDEN_NAME=${SCENE}
+                    -DGOLDEN_PLAYER=$<TARGET_FILE:player>
+                    -DGOLDEN_IMGDIFF=$<TARGET_FILE:efx_imgdiff>
+                    -DGOLDEN_SCENE=${CMAKE_CURRENT_SOURCE_DIR}/goldens/${SCENE}
+                    -DBINARY_DIR=${CMAKE_BINARY_DIR}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_golden.cmake)
+        else()
+            message(STATUS "golden test deferred (no golden.png yet): ${SCENE}")
+        endif()
     endforeach()
 endif()
 

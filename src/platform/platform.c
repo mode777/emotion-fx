@@ -52,7 +52,7 @@ static sg_pass_action efx_pass_action(void) {
 
 #ifdef SOKOL_METAL
 static void efx_capture_setup(void) {
-    const void *dev = sapp_metal_get_device();
+    const void *dev = sapp_get_environment().metal.device;
     if (!dev) {
         return;
     }

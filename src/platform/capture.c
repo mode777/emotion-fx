@@ -128,7 +128,7 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     if (!g_capture_tex) {
         return -1;
     }
-    id<MTLDevice> dev = (__bridge id<MTLDevice>)sapp_metal_get_device();
+    id<MTLDevice> dev = (__bridge id<MTLDevice>)sapp_get_environment().metal.device;
     if (!dev) {
         return -1;
     }

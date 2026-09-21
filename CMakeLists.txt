@@ -25,6 +25,9 @@ add_library(efx_core STATIC
 )
 target_include_directories(efx_core PUBLIC src)
 target_link_libraries(efx_core PUBLIC qjs)
+if(UNIX)
+    target_link_libraries(efx_core PUBLIC m)
+endif()
 if(MSVC)
     target_compile_options(efx_core PRIVATE /W4 /WX)
 else()
@@ -37,12 +40,10 @@ endif()
 add_library(efx_platform STATIC
     src/platform/platform.c
     src/platform/pipeline.c
+    src/platform/capture.c
 )
-target_include_directories(efx_platform PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/vendor/sokol)
-
-add_library(efx_capture STATIC src/platform/capture.c)
-target_include_directories(efx_capture PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/vendor/sokol ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
-target_link_libraries(efx_capture PUBLIC efx_platform)
+target_include_directories(efx_platform PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/vendor/sokol
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
 if(MSVC)
     target_compile_options(efx_platform PRIVATE /W4)
 elseif(NOT EMSCRIPTEN)
@@ -56,7 +57,7 @@ add_executable(player
     src/main.c
     src/player/player.c
 )
-target_link_libraries(player PRIVATE efx_core efx_platform efx_capture)
+target_link_libraries(player PRIVATE efx_core efx_platform)
 
 if(EMSCRIPTEN)
     set_target_properties(player PROPERTIES SUFFIX ".js")
@@ -76,7 +77,7 @@ if(EMSCRIPTEN)
     # to MEMFS /captures/<scene>.png and read back by tools/run_web_goldens.mjs
     if(EFX_BUILD_GOLDEN_TESTS)
         add_executable(player_web_golden src/main.c src/player/player.c)
-        target_link_libraries(player_web_golden PRIVATE efx_core efx_platform efx_capture)
+        target_link_libraries(player_web_golden PRIVATE efx_core efx_platform)
         set_target_properties(player_web_golden PROPERTIES SUFFIX ".js")
         target_link_options(player_web_golden PRIVATE
             -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2
