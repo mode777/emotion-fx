@@ -1,6 +1,9 @@
 # 0014 — Skinning follows the glTF data model; seven resource types
 
-Status: Accepted (2026-09, change `js-api-reference`)
+Status: Accepted (2026-09, change `js-api-reference`); the glTF data
+mapping stands, but the resource-exposure aspect (Skeleton/Animation as
+script resources) is superseded by 0017 — rigs and clips are implicit Mesh
+payload
 Supersedes: 0013
 
 ## Context

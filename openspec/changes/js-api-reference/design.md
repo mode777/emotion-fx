@@ -71,7 +71,12 @@ efx.drawQuad(x, y, w, h, opts?)   // records a colored/textured quad
   reshaped by that milestone's change (via its `js-api` delta).
 - Option-object parameters (`opts?`) for anything beyond ~3 scalar args, so
   signatures extend without breaking calls. Scalar-first for hot
-  immediate-mode calls (`drawQuad`, `drawMesh`).
+  immediate-mode calls (`drawQuad`, `drawMesh`). Optionality is explicit at
+  two levels: bag-level `?` = fully omittable (all fields defaulted);
+  field-level `?` = optional only when a default is documented — unmarked
+  fields are required. Validation: missing/wrong-typed required fields and
+  unknown fields throw `TypeError` (typo protection); "null disables" bags
+  accept `null`.
 
 ### D4: Units and value conventions
 Angles in **degrees** (old-school/raylib convention; converted internally —
@@ -93,18 +98,17 @@ and easy to ignore in game scripts.
 - **JS-managed:** materials (plain objects read by `efx.setMaterial`),
   colors, transforms, and the F8 font object (atlas Texture + quad layout,
   pure JS) — created and dropped freely, GC handles lifetime.
-- **Native-backed classes** — the seven-type taxonomy of ADR 0014
-  (supersedes 0013): MeshData (skinned meshes carry `joints`/`weights`
-  vertex attributes, glTF-style), ImageData, Skeleton (joint hierarchy +
-  inverse bind matrices ≈ glTF `skin`), Animation (CPU-side) and Mesh,
-  Texture, RenderTarget (GPU). Opaque GC-finalized JS objects wrapping
-  native handles — **fully opaque at first (`destroy()` only); query
-  methods, getters, and setters are reserved for later** (the class
-  machinery supports adding them without changing call sites). Pipeline:
-  `createMesh(meshData)` / `createTexture(imageData)` upload CPU → GPU;
-  `setSkin(skel, mesh)` is the `node.mesh + node.skin` equivalent, posing
-  in place (CPU skinning chosen on engineering grounds — ADR 0014, with
-  the constraint clarified in ADR 0015).
+- **Native-backed classes** — five types (ADR 0011 model; taxonomy ADR
+  0014 as amended by 0017): MeshData (skinned meshes carry `joints`/
+  `weights` vertex attributes, glTF-style), ImageData (CPU-side) and Mesh,
+  Texture, RenderTarget (GPU). Skins, skeletons, and animation clips are
+  **implicit Mesh payload** — bundled at load; the script drives posing
+  (`efx.poseMesh(mesh, samples)`, CPU skinning in place, script-owned
+  clock — ADR 0018) and `drawMesh` takes a `skinned` flag (posed buffer vs
+  retained bind-pose buffer). Opaque GC-finalized JS objects
+  wrapping native handles — **fully opaque at first (`destroy()` only)**.
+  Pipeline: `createMesh(meshData)` / `createTexture(imageData)` upload CPU
+  → GPU.
   Native byte cost — CPU buffers included — counts toward GC pressure and
   the player collects at frame end, so unreferenced resources are reclaimed
   within roughly a frame even without `destroy()` (ADR 0012). The display
@@ -116,8 +120,9 @@ and easy to ignore in game scripts.
   provisional constants solving an allocation problem that classes remove.
 - Fixed limits table: 4 point lights, 1 directional light, 1 camera.
 Rationale, consequences, and rejected alternatives: ADR 0011 (model),
-ADR 0012 (memory discipline), ADR 0014 (taxonomy + skinning; supersedes
-0013).
+ADR 0012 (memory discipline), ADR 0014 (glTF data model; supersedes 0013),
+ADR 0017 (implicit rig payload + `skinned` flag), ADR 0018
+(script-driven posing).
 
 ### D7: High-level JS layer ships inside the player
 Pure-JS high-level functions (`efx.drawModel`, `efx.drawText`, procedural

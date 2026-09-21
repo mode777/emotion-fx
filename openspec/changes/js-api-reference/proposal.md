@@ -38,13 +38,15 @@ instead of making ad-hoc naming decisions inside its own change.
     and post FX, resource loading, skinning/animation, high-level
     `drawModel`/`drawText`), each entry tagged with its delivery milestone and
     implementation layer (`[C]` low/mid-level, `[JS]` high-level pure JS).
-  - Resource & memory model: JS-managed data objects, seven native-backed
-    GC-finalized opaque classes (MeshData, ImageData, Skeleton, Animation
-    on the CPU; Mesh, Texture, RenderTarget on the GPU — skinning follows
-    the glTF data model, ADR 0014 — fully opaque at first, `destroy()`
-    only), and slot banks reserved for the fixed light limits —
-    fixed-limits table (4 point lights, 1 directional, 1 camera) plus the
-    native-memory GC discipline (per ADRs 0011/0012).
+  - Resource & memory model: JS-managed data objects, five native-backed
+    GC-finalized opaque classes (MeshData, ImageData on the CPU; Mesh,
+    Texture, RenderTarget on the GPU — fully opaque at first, `destroy()`
+    only); skins/skeletons/animation clips are implicit Mesh payload posed
+    by the script (`efx.poseMesh`, ADR 0014 as amended by 0017/0018);
+    `drawMesh` takes a `skinned` flag for posed vs rest-pose
+    drawing; slot banks reserved for the fixed light limits — fixed-limits
+    table (4 point lights, 1 directional, 1 camera) plus the native-memory
+    GC discipline (per ADRs 0011/0012).
   - Error handling and exit-code interaction of API calls.
 - Add a new `js-api` capability spec that makes this reference normative: the
   layering rules, namespace rule, dependency rule, memory-model rules, and the

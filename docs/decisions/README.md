@@ -26,6 +26,8 @@ directory holds only what stays true after a change is archived.
 | [0014](0014-skinning-follows-gltf-data-model.md) | Accepted | Skinning follows the glTF data model; seven resource types (weights in MeshData, Skeleton ≈ glTF skin) |
 | [0015](0015-fixed-function-is-consumer-api-contract.md) | Accepted | Fixed-function is a consumer-API contract; internals use Sokol's programmable pipeline with canned shaders |
 | [0016](0016-explicit-hook-registration-implicit-init.md) | Accepted | Lifecycle via explicit stacking hook registration; loading main.js is the implicit init |
+| [0017](0017-implicit-rig-payload-skinned-flag.md) | Accepted | Skins and skeletons are implicit Mesh payload; `skinned` is a drawMesh flag (5 resource types) |
+| [0018](0018-script-driven-posing.md) | Accepted | Script-driven posing via `poseMesh`; no engine playback state |
 
 ## Adding a decision
 

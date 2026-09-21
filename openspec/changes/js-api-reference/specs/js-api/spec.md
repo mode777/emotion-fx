@@ -51,8 +51,10 @@ objects, garbage collected), native-backed class (an opaque JS object
 wrapping a native handle with an explicit `destroy()` release method —
 fully opaque at first; query methods, getters, and setters are reserved for
 later), or slot-based (a fixed pre-allocated bank of indexed resources).
-The native-backed classes SHALL be exactly: MeshData, ImageData, Skeleton,
-Animation, Mesh, Texture, and RenderTarget; extending this list
+The native-backed classes SHALL be exactly: MeshData, ImageData, Mesh,
+Texture, and RenderTarget; skins, skeletons, and animation clips are
+implicit Mesh payload — loaded with the mesh and posed by the script
+(`efx.poseMesh`) — and are not script resources; extending the class list
 requires a `js-api` delta. Every resource requiring native storage MUST be
 a native-backed class — released deterministically by its `destroy()`,
 reclaimed by its GC finalizer if the script never calls it, and finalized

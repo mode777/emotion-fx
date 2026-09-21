@@ -52,3 +52,20 @@
 - [x] 10.1 Write ADR 0016 (`docs/decisions/0016-explicit-hook-registration-implicit-init.md`): `efx.registerUpdateHook`/`efx.registerRenderHook` as the normative lifecycle API (ES6 callbacks, stacking in registration order, unsubscribe returned, `dt` on update hooks); loading `main.js` is the implicit init — runtime guarantees full engine readiness before script evaluation (F1's load-before-window order flips); F1 globals remain load-time sugar so the F1 gate and examples stay valid; REPL rationale + index row
 - [x] 10.2 Sync artifacts: spec lifecycle clause (registration model replaces `init`/`update`/`render` globals), proposal lifecycle bullet, design.md D9 rewrite + D10 samples note
 - [x] 10.3 Rework `docs/js-api.md`: Lifecycle hooks section (implicit init, registration sketch, sugar rule, REPL note), F1 section pointer, F2–F8 samples to top-level setup + `registerUpdateHook`/`registerRenderHook`, open questions + traceability row; run `openspec validate --strict`
+
+## 11. Iteration: implicit rig payload + `skinned` draw flag
+
+- [x] 11.1 Write ADR 0017 (`docs/decisions/0017-implicit-rig-payload-skinned-flag.md`): Skin/Skeleton/Animation are no longer script resources (5 native types) — rigs and clips bundle into the Mesh at import, playback state inside the Mesh; `skinned` chosen over `drawMeshSkinned` (identical option set + display-list record; per-draw semantics like `color`; three.js/Godot precedent noted); dual bind/posed buffers; `skinned: true` on non-skinned mesh throws; ADR 0014 status amended (glTF data mapping stands, exposure superseded); + index row
+- [x] 11.2 Sync artifacts: spec taxonomy list (5 classes + implicit-rig clause), proposal resource bullet, design.md D6 + rationale pointer
+- [x] 11.3 Rework `docs/js-api.md`: resource table (5 rows + implicit-rig note on Mesh), F6 `loadMesh` bundling note, F7 section rewrite (`playAnimation`/`pauseAnimation`/`blendAnimations` on the Mesh, `skinned` flag + bullets + sample), F8 `drawModel` forwards `skinned`, open questions (procedural rigs, clip naming); run `openspec validate --strict`
+
+## 12. Iteration: script-driven posing
+
+- [x] 12.1 Write ADR 0018 (`docs/decisions/0018-script-driven-posing.md`): `efx.poseMesh(mesh, pose)` (single sample or weighted array; time wraps, weights normalized, negatives throw) replaces the playback trio — the script owns the clock in the update hook; no engine playback state; stateful playback may return as pure-JS helper (F8 layer); ADR 0017 status amended; + index row
+- [x] 12.2 Sync artifacts: spec implicit-payload clause (`posed by the script`), proposal bullet, design.md D6 + rationale pointer
+- [x] 12.3 Rework `docs/js-api.md`: F7 section (two-function catalog, posing bullets, cross-fade sample with script-owned clock), Mesh table row (drop pose state), open questions (clip naming via `poseMesh`, stateful-helper candidate); run `openspec validate --strict`
+
+## 13. Iteration: explicit option-object convention
+
+- [x] 13.1 Audit all option-object signatures for true optionality; fix two bag-level mislabels (`createRenderTarget(opts)` and `drawText(text, x, y, opts)` — bags contain required fields); give `setMaterial` channels documented defaults (black/white/black/shininess 32), making them optional per convention
+- [x] 13.2 Make the convention explicit: two-level optionality rules (bag-level `?` = fully omittable; field-level `?` = optional only with documented default) + validation rules (missing/wrong-typed required fields and unknown fields throw `TypeError`; nullable "null disables" bags) in `docs/js-api.md` Conventions and design.md D3; run `openspec validate --strict`

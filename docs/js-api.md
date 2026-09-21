@@ -46,7 +46,16 @@ Every rule below traces to vision.md or to F1's implemented behavior.
   methods/getters/setters are reserved for later.
 - **Parameters**: hot immediate-mode calls take scalar arguments first
   (`drawQuad(x, y, w, h, opts?)`); configuration beyond ~3 values goes in a
-  trailing option object so signatures can grow without breaking calls.
+  trailing option object. Optionality is explicit at two levels:
+  - a `?` on the bag itself (`opts?`) means the whole object may be
+    omitted — every field then takes its documented default;
+  - a `?` on a field (`range?`) means that field may be omitted — fields
+    are optional **only when a default is documented**; unmarked fields
+    are required.
+- **Option-object validation**: a missing or wrongly-typed required field
+  throws `TypeError`; unknown fields throw `TypeError` (typo protection).
+  Bags documented as "null disables" (e.g. post FX) accept `null` as an
+  explicit off switch.
 - **Units**: angles in **degrees** (radians never appear in the API), time in
   **seconds**, positions and sizes in world units.
 - **Colors**: `[r, g, b, a]` arrays of normalized floats in `0..1`
@@ -92,10 +101,10 @@ offUpdate(); // optional unsubscribe
 
 Every resource type scripts can create or reference is classified exactly
 one way — the rule that keeps a GC'd language from leaking unmanaged memory
-(vision.md). Seven dynamic-count resource types are opaque **native-backed
+(vision.md). Five dynamic-count resource types are opaque **native-backed
 classes**; only the fixed light bank is slot-based (model: ADR 0011,
-memory discipline: ADR 0012, taxonomy + glTF skinning model: ADR 0014,
-all under `docs/decisions/`).
+memory discipline: ADR 0012, glTF data model: ADR 0014, implicit rig
+payload + `skinned` flag: ADR 0017, all under `docs/decisions/`).
 
 | Class | Meaning | Release path |
 |---|---|---|
@@ -107,9 +116,7 @@ all under `docs/decisions/`).
 |---|---|---|---|---|---|
 | MeshData | Attributes + indices; skinned meshes add `joints`/`weights` vertex attributes (glTF-style) | Native class | CPU | F3 | `createMeshData` / `loadMeshData` (F6) |
 | ImageData | Raw pixels + size + format | Native class | CPU | F2 | `createImageData` / `loadImage` (F6) |
-| Skeleton | Joint hierarchy + inverse bind matrices (≈ glTF `skin`) | Native class | CPU | F7 | `createSkeleton` / `loadSkeleton` |
-| Animation | Channels, keyframes, transforms | Native class | CPU | F7 | `createAnimation` / `loadAnimation` |
-| Mesh | GPU memory bound mesh | Native class | GPU | F3 | `createMesh(meshData)`; `mesh.destroy()` |
+| Mesh | GPU mesh; skinned meshes carry skin, skeleton, and clips internally (ADR 0017) | Native class | GPU | F3 | `createMesh(meshData)` / `loadMesh`; `mesh.destroy()` |
 | Texture | GPU texture | Native class | GPU | F2 | `createTexture(imageData)`; `tex.destroy()` |
 | RenderTarget | GPU render target | Native class | GPU | F5 | `createRenderTarget`; `rt.destroy()` |
 | Materials (Phong parameter objects) | — | JS-managed | — | F4 | Passed to `efx.setMaterial` |
@@ -293,12 +300,12 @@ per-channel maps + alpha masks (F4b).
 // F4a · C · provisional
 efx.setLight(slot, opts)         // slot 0..3 — point light { pos, color, range? }
 efx.setDirectionalLight(opts)    // { dir, color } — the single directional light
-efx.setMaterial(mat)             // Phong channels:
+efx.setMaterial(mat)             // Phong channels; omitted channels take defaults:
 // {
-//   ambient:  { color },
-//   diffuse:  { color },
-//   specular: { color, shininess },
-//   emissive: { color },
+//   ambient:  { color },             // default: black
+//   diffuse:  { color },             // default: white
+//   specular: { color, shininess? }, // default: black (shininess 32)
+//   emissive: { color },             // default: black
 // }
 ```
 
@@ -341,7 +348,7 @@ Scope from roadmap F5: RTT, fullscreen-quad passes, color filter, blur.
 
 ```js
 // F5 · C · provisional — render targets are native-backed classes
-efx.createRenderTarget(opts?)     // { width, height } → RenderTarget
+efx.createRenderTarget(opts)      // { width, height } → RenderTarget
 efx.beginRenderTarget(rt)         // redirect drawing into the target
 efx.endRenderTarget()             // back to the default target
 efx.drawRenderTarget(rt, x, y, w, h, opts?)  // draw a target as a textured quad
@@ -381,7 +388,7 @@ decided here), interactive REPL. Paths are relative to the resource root
 efx.loadText(path)        // → string
 efx.loadImage(path)       // → ImageData
 efx.loadMeshData(path)    // → MeshData
-efx.loadMesh(path)        // → Mesh (data + GPU upload in one step)
+efx.loadMesh(path)        // → Mesh — bundles skin, skeleton, and clips when the asset has them
 
 // F6 · JS · provisional — convenience composition on the public C layer
 efx.loadTexture(path)     // → Texture (createTexture(loadImage(path)))
@@ -407,47 +414,46 @@ Scope from roadmap F7: CPU skinning into a mesh slot, skeleton/animation
 import, play/pause/blend.
 
 ```js
-// F7 · C · provisional
-efx.createSkeleton(data)             // → Skeleton — joints + inverse bind matrices (≈ glTF `skin`)
-efx.loadSkeleton(path)               // → Skeleton
-efx.createAnimation(data)            // → Animation
-efx.loadAnimation(path)              // → Animation
-efx.setSkin(skel, mesh)              // bind a Skeleton to a skinned Mesh (≈ node.mesh + node.skin)
-efx.playAnimation(skel, opts?)       // { animation, loop?, speed? } — Animation object
-efx.pauseAnimation(skel)
-efx.blendAnimations(skel, a, b, t)   // blend the poses of Animations a and b at weight t
+// F7 · C · provisional — skin, skeleton, and clips are implicit Mesh payload (ADR 0017);
+// the script drives posing, no engine playback state (ADR 0018)
+efx.poseMesh(mesh, pose)   // pose: { clip, time, weight? } or [ samples ]; CPU-poses in place
+efx.drawMesh({ mesh, transform?, color?, skinned? }) // skinned: true → current posed buffer
 ```
 
-- The skinning pipeline follows the glTF data model (ADR 0014): skinned
-  MeshData carries per-vertex `joints` + `weights` attributes (typically
-  4 influences) alongside its bind-pose positions, uploaded with
-  `efx.createMesh`. `efx.setSkin` binds a Skeleton to that Mesh; every
-  frame the CPU computes the posed vertices **in place** —
-  `efx.drawMesh({ mesh })` renders it. Destroying a bound Mesh or Skeleton
-  unbinds first.
-- To keep the bind pose, create a second Mesh from the same MeshData;
-  skinning only rewrites the Mesh given to `setSkin`. A different skeleton
-  on the same model is a rebind (or a second Mesh) — mirroring glTF's
-  per-node skins.
+- A skinned asset loads as one Mesh carrying its rig: skin weights,
+  skeleton (joint hierarchy + inverse bind matrices, glTF-style), and
+  animation clips. No rig resources and no playback state are exposed to
+  scripts — the script owns the clock.
+- `efx.poseMesh` samples one clip or a weighted blend and CPU-poses the
+  mesh **in place**: `time` wraps modulo the clip length, weights are
+  normalized (negative weights throw). Call it from the update hook;
+  `skinned: true` then draws the posed vertices, absent/`false` the
+  retained bind-pose buffer (~2× vertex memory for skinned meshes).
+  `skinned: true` on a mesh without a rig throws (`TypeError`). The flag
+  is per-draw, like `color` — a second `drawMeshSkinned` method would
+  duplicate the identical option set.
+- A stateful playback helper (play/pause/blend) may return later as a
+  pure-JS convenience over `poseMesh` (F8 layer) — additive, never engine
+  state.
 
 ```js
 // main.js — F7 sample (provisional API)
 efx.setCamera3D({ pos: [0, 1.5, 4], target: [0, 1, 0], fov: 60 });
-const hero = efx.loadMesh('actors/hero.mesh');    // bind pose + joints/weights attributes
-const skel = efx.loadSkeleton('actors/hero.skel');
-const walk = efx.loadAnimation('actors/hero.walk');
-const run  = efx.loadAnimation('actors/hero.run');
-efx.setSkin(skel, hero);
-efx.playAnimation(skel, { animation: walk, loop: true });
+const hero = efx.loadMesh('actors/hero.mesh');   // geometry + rig + clips in one Mesh
 
 let t = 0;
 efx.registerUpdateHook(dt => {
     t += dt;
-    efx.blendAnimations(skel, walk, run, Math.min(1, t / 2)); // walk → run over 2s
+    const k = Math.min(1, t / 2); // walk → run cross-fade over 2s
+    efx.poseMesh(hero, [
+        { clip: 'walk', time: t, weight: 1 - k },
+        { clip: 'run',  time: t, weight: k },
+    ]);
 });
 
 efx.registerRenderHook(() => {
-    efx.drawMesh({ mesh: hero }); // renders the current CPU-skinned pose
+    efx.drawMesh({ mesh: hero, skinned: true }); // current CPU-skinned pose
+    // efx.drawMesh({ mesh: hero });             // bind (rest) pose
 });
 ```
 
@@ -460,9 +466,9 @@ built only on the public `[C]` API above.
 ```js
 // F8 · JS · provisional
 efx.loadFont(path)                   // → font object (JS-managed: atlas Texture + quad layout)
-efx.drawModel(mesh, mat, opts?)      // { transform? } — one-call model drawing
+efx.drawModel(mesh, mat, opts?)      // { transform?, skinned? } — one-call model drawing
                                      // over setMaterial + drawMesh
-efx.drawText(text, x, y, opts?)      // { font, size?, color? } — text as quads
+efx.drawText(text, x, y, opts)       // { font, size?, color? } — text as quads
 ```
 
 ```js
@@ -529,5 +535,12 @@ API for them:
 - **Hook registration + `dt` delivery** — target contract (ADR 0016);
   delivered by the next runtime change (F2 at the latest); F1 globals
   remain as load-time sugar.
+- **Procedural rigs** — F7 bundles skins/skeletons/clips at *import* only;
+  constructing a rig procedurally (from `createMeshData` + skeleton data)
+  has no path yet. Deferred until a concrete need appears.
+- **Clip naming** — `poseMesh` accepts name or index; the exact clip
+  naming/lookup rules follow the asset format decision (F6).
+- **Stateful playback helper** — play/pause/blend convenience as pure JS
+  over `poseMesh` is an F8-layer candidate, not engine state (ADR 0018).
 - **REPL introspection helpers** — whether the F6 console mode needs extra
   `efx` functions beyond the interactive namespace is deferred to F6.
