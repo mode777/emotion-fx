@@ -41,7 +41,15 @@ const PAGE_HTML = `<!doctype html>
 <script>
 window.__rafCount = 0;
 const __raf = window.requestAnimationFrame.bind(window);
-window.requestAnimationFrame = (cb) => { window.__rafCount++; return __raf(cb); };
+window.requestAnimationFrame = (cb) => {
+    window.__rafCount++;
+    if (window.__rafCount <= 3) console.log('[raf] tick ' + window.__rafCount);
+    return __raf((t) => {
+        try { cb(t); } catch (e) { console.log('[raf-cb-throw]', e && (e.message || e)); throw e; }
+    });
+};
+window.addEventListener('unhandledrejection', (e) => console.log('[rejection]', e.reason && (e.reason.message || e.reason)));
+window.addEventListener('error', (e) => console.log('[page-err]', e.message));
 </script>
 <script src="/player_web_golden.js"></script></body></html>`;
 
@@ -113,7 +121,9 @@ for (const scene of scenes) {
             }
         }
         console.log('[diag] raf ticks:', window.__rafCount,
-            'webgl2:', !!document.createElement('canvas').getContext('webgl2'));
+            'canvas-webgl2:', !!document.getElementById('canvas').getContext('webgl2'),
+            'module-calls:', typeof Module.callMain, typeof Module._main,
+            'captures dir:', (() => { try { return M.FS.readdir('/captures').join(','); } catch (e) { return 'none: ' + e.message; } })());
         return null;
     }, scene);
 
