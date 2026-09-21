@@ -7,10 +7,13 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
 
 ## Current state
 
-- F1 (player skeleton) is **done**; F2 (2D layer) is **implemented, gate
-  pending CI verification** — see `openspec/changes/f2-2d-layer`. The
-  normative milestone ladder is `openspec/specs/feature-roadmap`; the
-  table below summarizes it.
+- F1 (player skeleton) is **done**; F2 (2D layer) is **implemented but
+  incomplete/gated** — see `openspec/changes/f2-2d-layer` (verified on
+  GLCORE/GLES3; blocked on D3D11/Metal quads and the web GC crash) and the
+  two stacked follow-ups `openspec/changes/f2a-sokol-shdc` (sokol-shdc
+  generated canned shaders) and `openspec/changes/f2b-web-native-runtime`
+  (no quickjs in the browser; native JS bridge). The normative milestone
+  ladder is `openspec/specs/feature-roadmap`; the table below summarizes it.
 - `src/` is a single core static library (`platform`, `runtime`, `api`,
   `player`, `render`) plus a thin `main.c` (ADR 0003). Sokol and
   quickjs-ng are vendored pinned snapshots under `vendor/`
@@ -58,7 +61,7 @@ implements.
 | # | Milestone | Scope (one line) | Verification gate | Status |
 |---|-----------|------------------|-------------------|--------|
 | F1 | Player skeleton | CMake + vendored Sokol/QuickJS, window, resource root, `main.js` hooks, `--script` run mode | Builds on Win/Linux/macOS/Emscripten; script smoke test crosses the JS/C boundary and exits 0 on each | done |
-| F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | implemented, gate pending CI |
+| F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | incomplete: GLCORE/GLES3 verified; D3D11/Metal quads + web GC blocked (see f2a/f2b) |
 | F3 | 3D core | Camera, mesh slots, `drawMesh`, matrix math, depth test, vertex colors, procedural primitives | Golden images + math unit tests | planned |
 | F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); canned-shader strategy settled here at the latest | Golden images + lighting unit tests against a CPU reference implementation | planned |
 | F5 | Render targets + post FX | RTT, fullscreen-quad passes, color filter, blur | Golden images | planned |

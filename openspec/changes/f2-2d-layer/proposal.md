@@ -1,5 +1,26 @@
 # Proposal
 
+> **STATUS: INCOMPLETE — BLOCKED (2026-09-21).** Implemented and verified on
+> GLCORE (Linux) and GLES3/WebGL2 (Emscripten/Node); blocked on two follow-up
+> changes that supersede its remaining open items:
+>
+> 1. `f2a-sokol-shdc` — the hand-written per-backend canned shaders render
+>    nothing on D3D11 (Windows) and Metal (macOS) while GLSL/GLES3 works;
+>    this change replaces the hand-written shader block with sokol-shdc
+>    generated shaders and must land before the D3D11/Metal golden gates
+>    can pass.
+> 2. `f2b-web-native-runtime` — `JS_RunGC` segfaults when called from the
+>    browser frame callback in the quickjs-based web runtime (deterministic,
+>    first frame-end collection, even for trivial scripts). That follow-up
+>    removes quickjs from the browser platform entirely, eliminating the
+>    crash class; until then the capture build skips frame-end GC (guarded
+>    by `EFX_WEB_GOLDEN`) and the `golden tests (emscripten)` CI job stays
+>    red.
+>
+> Everything else in this change is done and verified: full 2D API, display
+> list, GLCORE/GLES3 canned pipeline, capture run mode, canonical goldens,
+> 36/36 ctest on Linux llvmpipe, 30/30 headless suite on all four targets.
+
 **Roadmap position:** Implements milestone **F2 (2D layer)** from
 `openspec/specs/feature-roadmap`. The predecessor gate (F1) has passed on all
 four targets, so this proposal is in roadmap order.

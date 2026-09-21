@@ -3,6 +3,14 @@
 Implements F2 (2D layer). Decisions D1–D10 refer to design.md; behavior
 requirements live in the delta specs (`2d-layer`, `verification`).
 
+**STATUS: INCOMPLETE — BLOCKED.** Tasks 7.1–7.3 and 9.x cannot pass until
+the two follow-up changes land: `f2a-sokol-shdc` (D3D11/Metal quads render
+nothing — hand-written shader defect, superseded by that change) and
+`f2b-web-native-runtime` (JS_RunGC segfault in browser frame callback; the
+web golden job stays red until quickjs is removed from the web platform).
+Windows/macOS capture readback itself is verified working (clear colors
+pixel-exact; only the shader-driven quads are missing).
+
 ## 1. Vendoring and render module skeleton
 
 - [x] 1.1 Vendor pinned `stb_image.h` and `stb_image_write.h` snapshots into `vendor/stb/`, record source repo + pinned version/hashes in `vendor/README.md` (evaluation in proposal.md); verify both headers compile in a trivial TU on the host and a round-trip encode/decode of a small buffer matches byte-for-byte
