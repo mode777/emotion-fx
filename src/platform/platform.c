@@ -46,7 +46,6 @@ static sg_pass_action efx_pass_action(void) {
     memset(&pa, 0, sizeof(pa));
     float c[4];
     efx_render_clear_color(c);
-    fprintf(stderr, "efx: trace clear %.2f %.2f %.2f %.2f\n", c[0], c[1], c[2], c[3]);
     pa.colors[0].load_action = SG_LOADACTION_CLEAR;
     pa.colors[0].clear_value = (sg_color){c[0], c[1], c[2], c[3]};
     return pa;
@@ -99,11 +98,9 @@ static void efx_init_cb(void) {
 
 static void efx_frame_cb(void) {
     g_frame++;
-    fprintf(stderr, "efx: frame %d\n", g_frame);
     efx_render_begin_frame();
     efx_render_set_viewport(sapp_width(), sapp_height());
     if (g_hooks.on_frame && g_hooks.on_frame(g_hooks.ud)) {
-        fprintf(stderr, "efx: on_frame stop\n");
         sapp_quit();
         return;
     }
@@ -133,13 +130,10 @@ static void efx_frame_cb(void) {
         .action = efx_pass_action(),
         .swapchain = sglue_swapchain(),
     });
-    fprintf(stderr, "efx: trace pass-begin\n");
     efx_pipeline_play();
-    fprintf(stderr, "efx: trace play-done\n");
     sg_end_pass();
 #endif
     sg_commit();
-    fprintf(stderr, "efx: trace commit\n");
     efx_render_end_frame();
 
     if (g_capture.frame > 0 && g_frame >= g_capture.frame) {
@@ -168,7 +162,6 @@ static void efx_frame_cb(void) {
         } else {
             fprintf(stderr, "player: capture readback failed\n");
         }
-        fprintf(stderr, "efx: capture done %d\n", g_frame);
         sapp_quit();
     }
 }

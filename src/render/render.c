@@ -43,7 +43,6 @@ static struct {
 
 void efx_render_install_sink(const efx_render_sink *sink) {
     R.sink = sink;
-    efx_render_reset_state();
     flush_pending_uploads();
 }
 
