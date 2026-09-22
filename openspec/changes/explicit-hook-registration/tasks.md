@@ -33,4 +33,4 @@
 
 - [x] 6.1 Run the full local ctest suite (smoke + `efx_render_tests` + `efx_api_tests`) and confirm the existing F1/F2 smoke tests, the six golden scenes (where a display exists, `-DEFX_BUILD_GOLDEN_TESTS=ON`), and the new hook tests all pass, proving globals-as-sugar did not change output
 - [x] 6.2 Build and run the Emscripten target's web tests under Node plus `tools/run_web_compare.mjs`, confirming desktop/web parity for the portable scripts and the new explicit-hook fixture
-- [ ] 6.3 Per AGENTS.md/ADR 0023, trigger a manual CI run (`gh workflow run ci.yml`) and verify the four-target matrix — Linux first, then Windows, then macOS — is green before archive
+- [x] 6.3 Per AGENTS.md/ADR 0023, trigger a manual CI run (`gh workflow run ci.yml`) and verify the four-target matrix — Linux first, then Windows, then macOS — is green before archive
