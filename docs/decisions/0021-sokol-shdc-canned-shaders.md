@@ -15,7 +15,7 @@ roundtrips is exactly the failure mode sokol's shader cross-compiler
 (sokol-shdc) exists to prevent: one annotated GLSL source, compiled at
 build time into a C header carrying correct per-backend sources, entry
 points, attribute semantics and resource bindings. Full process record:
-`openspec/changes/f2a-sokol-shdc/`.
+`openspec/changes/archive/2026-09-22-f2a-sokol-shdc/`.
 
 ## Decision
 
@@ -40,7 +40,8 @@ generation-time tool.)
   committed and CI verifies regeneration produces no drift.
 - Emscripten keeps compiling from the same single source (GLES3 flavor),
   though its verification was explicitly out of scope for the adopting
-  change (`f2a-sokol-shdc`) and is `f2b-web-native-runtime`'s to gate.
+  change (`f2a-sokol-shdc`) and was gated later by
+  `f2b-web-native-runtime`.
 
 ## Rejected alternatives
 

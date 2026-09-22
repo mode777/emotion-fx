@@ -14,7 +14,7 @@ Windows, Metal on macOS, GLES3/WebGL2 on Emscripten) and CI runners are
 GPU-less, so the harness must survive (a) cross-backend floating-point
 differences in rasterization and (b) runner-side software rendering. The
 roadmap assigned this tolerance/determinism decision to F2. Full process
-record: `openspec/changes/f2-2d-layer/` (design D7–D9).
+record: `openspec/changes/archive/2026-09-22-f2-2d-layer/` (design D7–D9).
 
 ## Decision
 

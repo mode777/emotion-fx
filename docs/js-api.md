@@ -1,9 +1,9 @@
 # EmotionFX JavaScript API Reference
 
-**Status:** F1 is implemented (current behavior). Everything from F2 onward is
-a provisional contract — names and signatures may be reshaped by the change
-that delivers them (every API change must update this document in the same
-change). See `vision.md` for product goals and
+**Status:** F1 and F2 are implemented (current behavior). Everything from F3
+onward is a provisional contract — names and signatures may be reshaped by the
+change that delivers them (every API change must update this document in the
+same change). See `vision.md` for product goals and
 `openspec/specs/feature-roadmap` for the milestone ladder.
 
 ## Overview
@@ -27,8 +27,8 @@ change). See `vision.md` for product goals and
   layer:
 
   ```js
-  // F2 · C · provisional
-  efx.drawQuad(x, y, w, h, opts?)
+  // F2 · C · current
+  efx.drawQuad(x, y, w, h, texture, opts?)
   ```
 
   Entries without a `provisional` marker describe current, shipped behavior.
@@ -101,9 +101,10 @@ offUpdate(); // optional unsubscribe
   load-time sugar — equivalent to a registration at the end of loading
   `main.js` — so F1 scripts keep working unchanged.
 - `registerUpdateHook`/`registerRenderHook`, the `dt` argument, and the
-  readiness-before-load ordering are delivered by the next runtime change
-  (F2 at the latest). The REPL (F6) registers through the same functions —
-  the reason registration, not globals, is the normative model.
+  readiness-before-load ordering remain provisional: F2 did not deliver
+  them (hook registration was out of its scope), so they stay pending a
+  future runtime change. The REPL (F6) registers through the same
+  functions — the reason registration, not globals, is the normative model.
 
 ## Resource & memory model
 
@@ -288,13 +289,13 @@ const logo = efx.createTexture(
 efx.setClearColor([0.08, 0.09, 0.12, 1]);
 efx.setCamera2D({ frame: [640, 480] }); // virtual 640×480 frame, view centered
 
-efx.registerRenderHook(() => { // or global render() sugar
+function render() { // global hook (registration is a future runtime change)
     efx.setBlendMode('alpha');
     efx.drawQuad(64, 64, 128, 128, logo); // textured sprite
     efx.setBlendMode('additive');
     efx.drawQuad(224, 96, 64, 64, efx.whiteTexture, { color: [1, 0.5, 0, 1] });
     efx.setBlendMode('alpha');
-});
+}
 ```
 
 ### F3 — 3D core (provisional)
@@ -596,8 +597,8 @@ API for them:
   allowed extensions, image embedding. Until then `load*` signatures stay
   provisional.
 - **Hook registration + `dt` delivery** — target contract (ADR 0016);
-  delivered by the next runtime change (F2 at the latest); F1 globals
-  remain as load-time sugar.
+  F2 did not deliver it (out of scope), so it stays pending a future
+  runtime change; F1 globals remain as load-time sugar.
 - **Procedural rigs** — F7 bundles skins/skeletons/clips at *import* only;
   constructing a rig procedurally (from `createMeshData` + skeleton data)
   has no path yet. Deferred until a concrete need appears.

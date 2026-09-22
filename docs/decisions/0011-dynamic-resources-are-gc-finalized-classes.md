@@ -45,8 +45,8 @@ Resources are classified by count, and the JS shape follows the count:
 - Display-list records hold traced `JSValue`s instead of `int` indices and
   state grouping compares opaque pointers — slightly heavier, negligible at
   PS2-era scene sizes.
-- F2 (first native resource class) must build the class machinery once:
-  class-ID registration, finalizers, argument validation — then each new
+- F2 (first native resource class) built the class machinery once:
+  class-ID registration, finalizers, argument validation — each new
   class is cheap.
 - Future `js-api` deltas must model new resource types as classes (or
   justify a genuinely fixed bank) per the `js-api` classification rule.

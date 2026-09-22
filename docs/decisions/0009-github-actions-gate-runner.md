@@ -23,11 +23,12 @@ needs no display anywhere.
 
 - Milestone verification gates are proven in CI; local runs cover only
   the toolchains the dev machine actually has.
-- The Emscripten job tracks `latest` emsdk for F1; **pinning settles in
+- The Emscripten job tracked `latest` emsdk for F1; **pinning settled in
   F2** together with golden-image CI determinism, as the roadmap
-  assigns.
+  assigns (emsdk is now pinned to an exact version in `ci.yml`, ADR 0020).
 - Golden-image tests (F2+) must stay deterministic on shared CI runners;
-  software-rendering/lockstep decisions belong to the F2 change.
+  the software-rendering/lockstep decisions were settled by the F2 change
+  (ADR 0020).
 
 ## Rejected alternatives
 

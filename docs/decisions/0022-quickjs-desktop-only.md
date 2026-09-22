@@ -7,7 +7,8 @@ Status: Accepted (2026-09, `f2b-web-native-runtime`)
 `f2-2d-layer` added a frame-end `JS_RunGC` to the player loop; in the
 browser build that call deterministically segfaults (first collection,
 even for a trivial script — forensic trail in
-`openspec/changes/f2-2d-layer/tasks.md`). The embedded interpreter buys
+`openspec/changes/archive/2026-09-22-f2-2d-layer/tasks.md`). The embedded
+interpreter buys
 nothing on the browser platform — the page already *is* an ES6 engine —
 while costing the segfault, a larger wasm, and a second JS dialect
 boundary. `vision.md` asks for the opposite: an Emscripten bridge so the

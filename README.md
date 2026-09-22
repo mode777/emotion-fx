@@ -3,7 +3,7 @@
 An old-school, PS2-era 3D engine: fixed-function pipeline, super lightweight,
 scripted in ES6. See `vision.md` for the product vision and
 `openspec/specs/feature-roadmap` for the milestone ladder. Current status:
-**F2 (2D layer) implemented; gate verified via CI**.
+**F2 (2D layer) done; gate verified via CI**.
 
 ## What F2 delivers (on top of F1)
 
@@ -21,8 +21,9 @@ scripted in ES6. See `vision.md` for the product vision and
 
 - A single-binary **player** built with CMake for Windows, Linux, macOS, and
   Emscripten.
-- Embedded **quickjs-ng** ES6 runtime on every target (browser builds run the
-  same core through Emscripten).
+- Embedded **quickjs-ng** ES6 runtime on desktop; on Emscripten the browser's
+  native JS engine drives the same core through the `src/web/` bridge, with no
+  quickjs in the wasm (ADR 0022).
 - A resource root (folder) loaded from the command line, with a `main.js`
   entry script providing `update`/`render` frame hooks.
 - A headless `--script` run mode that executes one script and propagates its

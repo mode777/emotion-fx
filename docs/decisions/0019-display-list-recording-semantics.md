@@ -1,7 +1,7 @@
 # 0019 — Display list records are frame-transient; value-snapshot small state, handle-reference resources
 
-Status: Accepted (2026-09, F2 design exploration — implementation lands with
-the F2 change)
+Status: Accepted (2026-09, F2 design exploration — implementation landed in
+the archived `f2-2d-layer` change)
 Supports: vision.md — "immediate mode api does not mean immediate mode
 rendering"
 
@@ -66,15 +66,16 @@ F2 display-list unit-test gate).
   batching then reduces state changes and draw calls below what naive
   immediate would pay.
 - One documented behavior delta vs naive immediate expectations:
-  `poseMesh` between two draws of the same mesh affects both. The
-  strictness (warn, throw, or document-only) is deferred to the F2
-  change.
+  `poseMesh` between two draws of the same mesh affects both. F2 had no
+  `poseMesh`, so the strictness question was re-targeted to F7 — there is
+  nothing to be strict about until posing exists.
 - Stable-sort determinism gives a platform-independent draw order, which
   the F2 golden-image harness relies on.
-- Deferred to the F2 change (open there, not here): the script-facing
-  sort-key UX (explicit `layer` option vs auto-keying), the arena budget
-  and overflow policy (ADR 0012 interaction), and the pose-after-draw
-  strictness above.
+- The three items deferred here were settled by the archived `f2-2d-layer`
+  change: the F2 sort key is the record index (playback is record order,
+  no reordering yet); the record arena is a 16 MiB hard cap that throws
+  `RangeError` on overflow; and the pose-after-draw strictness moved to
+  F7 as above.
 
 ## Rejected alternatives
 

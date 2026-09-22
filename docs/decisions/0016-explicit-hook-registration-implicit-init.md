@@ -2,7 +2,7 @@
 
 Status: Accepted (2026-09, change `js-api-reference`)
 Supersedes: the `init()` hook portion of the D9 sketch in
-`openspec/changes/js-api-reference/design.md`
+`openspec/changes/archive/2026-09-21-js-api-reference/design.md`
 
 ## Context
 
@@ -42,7 +42,8 @@ readiness before script evaluation, top-level code *is* the init.
 
 - Player runtime: hook pickup becomes dynamic (a list, not a one-time
   property read); the readiness-before-eval ordering is a one-time runtime
-  change delivered with the registration pair (F2 at the latest).
+  change delivered together with the registration pair. F2 scoped hook
+  registration out, so this remains pending a future runtime change.
 - Callback count is unbounded and order matters; an exception in any hook
   halts the run (existing error contract applies).
 - REPL sessions that re-register accumulate hooks; unsubscribe (or session

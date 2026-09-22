@@ -7,13 +7,15 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
 
 ## Current state
 
-- F1 (player skeleton) is **done**; F2 (2D layer) is **implemented** —
-  GLCORE/GLES3 verified, `f2a-sokol-shdc` archived (D3D11/Metal quads
-  green), and `f2b-web-native-runtime` implemented: the web player runs on
-  the browser's native JS engine through the `src/web/` bridge, with no
-  quickjs in the wasm (ADR 0022). The milestone gate still needs the full
-  four-target CI matrix green. See `openspec/changes/f2-2d-layer` and
-  `openspec/changes/f2b-web-native-runtime`.
+- F1 (player skeleton) and F2 (2D layer) are **done** — the F2 gate is
+  verified green on the full four-target CI matrix (native 41/41 on
+  Windows/Linux/macOS with all six golden scenes, Emscripten 23/23, web
+  goldens all six scenes). The two follow-ups are archived too:
+  `f2a-sokol-shdc` (D3D11/Metal quads via generated canned shaders, ADR
+  0021) and `f2b-web-native-runtime` (the web player runs on the browser's
+  native JS engine through the `src/web/` bridge, with no quickjs in the
+  wasm, ADR 0022). The F2 change is archived at
+  `openspec/changes/archive/2026-09-22-f2-2d-layer`.
 - `src/` is a single core static library (`platform`, `runtime`, `api`,
   `player`, `render`) plus a thin `main.c` (ADR 0003). Sokol and
   quickjs-ng are vendored pinned snapshots under `vendor/`
@@ -71,7 +73,7 @@ implements.
 | # | Milestone | Scope (one line) | Verification gate | Status |
 |---|-----------|------------------|-------------------|--------|
 | F1 | Player skeleton | CMake + vendored Sokol/QuickJS, window, resource root, `main.js` hooks, `--script` run mode | Builds on Win/Linux/macOS/Emscripten; script smoke test crosses the JS/C boundary and exits 0 on each | done |
-| F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | incomplete: GLCORE/GLES3 + web native-runtime verified; f2a (shdc) archived, f2b (web runtime) implemented (ADR 0022) — full four-target CI matrix pending |
+| F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | done — full four-target CI matrix green; `f2a` (shdc) + `f2b` (web runtime) archived, ADR 0021/0022 |
 | F3 | 3D core | Camera, mesh slots, `drawMesh`, matrix math, depth test, vertex colors, procedural primitives | Golden images + math unit tests | planned |
 | F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); F4 lighting shaders reuse the sokol-shdc pipeline (strategy settled in F2, ADR 0021) | Golden images + lighting unit tests against a CPU reference implementation | planned |
 | F5 | Render targets + post FX | RTT, fullscreen-quad passes, color filter, blur | Golden images | planned |
