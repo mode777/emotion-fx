@@ -2,9 +2,13 @@ name: ci
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ['v*']
   workflow_dispatch:
+
+# Version token embedded in the downloadable archives: the tag name on
+# tag runs, and a SHA-derived development token on manual runs (ADR 0023).
+env:
+  EFX_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', github.sha) }}
 
 jobs:
   native:
@@ -49,6 +53,42 @@ jobs:
           name: golden-failures-${{ matrix.os }}
           path: build/goldens/
 
+      - name: Package player archive (unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          name="emotion-fx-${EFX_VERSION}-${{ runner.os }}-${{ runner.arch }}"
+          mkdir -p dist
+          cp build/player "dist/$name"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          rm "dist/$name"
+
+      - name: Package player archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "emotion-fx-$env:EFX_VERSION-windows-${{ runner.arch }}"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item build/Release/player.exe "dist/$name.exe"
+          Compress-Archive -Path "dist/$name.exe" -DestinationPath "dist/$name.zip"
+          Remove-Item "dist/$name.exe"
+
+      - name: Upload player artifact (unix)
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: player-${{ runner.os }}-${{ runner.arch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+      - name: Upload player artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: player-windows-${{ runner.arch }}
+          path: dist/*.zip
+          if-no-files-found: error
+
   emscripten:
     name: build+test (emscripten)
     runs-on: ubuntu-latest
@@ -83,6 +123,24 @@ jobs:
         env:
           NATIVE_PLAYER: build-native/player
           WEB_PLAYER_BUILD: build-em
+
+      - name: Package web player bundle
+        run: |
+          set -euo pipefail
+          name="emotion-fx-${EFX_VERSION}-web"
+          for f in player_web.html player_web.js player_web.wasm player_web.data; do
+            test -f "build-em/$f" || { echo "missing build-em/$f" >&2; exit 1; }
+          done
+          mkdir -p "dist/$name"
+          cp build-em/player_web.html build-em/player_web.js build-em/player_web.wasm build-em/player_web.data "dist/$name/"
+          (cd dist && zip -r "$name.zip" "$name")
+
+      - name: Upload web bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: player-emscripten-web
+          path: dist/*.zip
+          if-no-files-found: error
 
   golden-web:
     name: golden tests (emscripten / headless chrome)
@@ -164,9 +222,36 @@ jobs:
           name: goldens
           path: tests/goldens/*/golden.png
 
+  release:
+    name: attach release assets
+    needs: [native, emscripten]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all target archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update release and attach archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ls -la dist
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+
   pages:
     name: deploy web player (github pages)
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -191,7 +276,7 @@ jobs:
         run: |
           mkdir pages
           cp build-web/player_web.html pages/index.html
-          cp build-web/player_web.js build-web/player_web.wasm build-web/player_web.data pages/
+          cp build-web/player_web.js build-web/player_web.wasm pages/
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3

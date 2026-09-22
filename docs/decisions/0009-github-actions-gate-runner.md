@@ -1,7 +1,9 @@
 # 0009 — GitHub Actions is the four-target gate runner
 
-Status: Accepted (F1; change `2026-09-19-f1-player-skeleton`, decided
-during apply)
+Status: Superseded by [0023](0023-tag-triggered-ci-and-releases.md) — the
+trigger policy (change `ci-tag-releases`); the gate-runner decision below
+otherwise stands. Originally Accepted (F1; change
+`2026-09-19-f1-player-skeleton`, decided during apply).
 
 ## Context
 

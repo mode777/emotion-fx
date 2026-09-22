@@ -18,7 +18,7 @@ directory holds only what stays true after a change is archived.
 | [0006](0006-vendored-pinned-source-snapshots.md) | Accepted | Dependencies are pinned source snapshots vendored in-repo |
 | [0007](0007-headless-script-mode-exit-codes.md) | Accepted | Headless `--script` mode with an exit-code contract is the automation surface |
 | [0008](0008-node-as-test-launcher-only.md) | Accepted | Node is a test launcher, never a script dependency |
-| [0009](0009-github-actions-gate-runner.md) | Accepted | GitHub Actions is the four-target gate runner |
+| [0009](0009-github-actions-gate-runner.md) | Superseded by [0023](0023-tag-triggered-ci-and-releases.md) (trigger policy) | GitHub Actions is the four-target gate runner |
 | [0010](0010-script-math-is-plain-js-data.md) | Accepted | Script math is plain JS data; GLM math stays behind the C wall |
 | [0011](0011-dynamic-resources-are-gc-finalized-classes.md) | Accepted | Dynamic-count resources are GC-finalized opaque classes; slots only for fixed banks |
 | [0012](0012-native-memory-gc-discipline.md) | Accepted | Native memory counts toward GC pressure; destroy-first, finalizer-backstop discipline |
@@ -32,6 +32,7 @@ directory holds only what stays true after a change is archived.
 | [0020](0020-golden-image-verification.md) | Accepted | Golden images: PNG via vendored stb, ±2/255 tolerance with a 0.5% pixel exemption, software rasterizers and pinned toolchains in CI |
 | [0021](0021-sokol-shdc-canned-shaders.md) | Accepted | Canned shaders come from sokol-shdc; one GLSL source, no hand-written per-backend flavors |
 | [0022](0022-quickjs-desktop-only.md) | Accepted | quickjs never ships to the browser; the browser's native JS engine is the web runtime behind the `src/web/` bridge |
+| [0023](0023-tag-triggered-ci-and-releases.md) | Accepted | CI runs on `v*` tags and manual dispatch only, and every run publishes four downloadable target archives (tag runs attach them to the release) |
 
 ## Adding a decision
 

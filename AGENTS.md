@@ -37,6 +37,13 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   exists — Linux CI under `xvfb-run` + llvmpipe, Emscripten in pinned
   headless Chrome (ADR 0020). Local builds without a display configure with
   `-DEFX_BUILD_GOLDEN_TESTS=OFF` (the default).
+- **CI runs on tags and manually, never per push (ADR 0023).**
+  `.github/workflows/ci.yml` triggers only on `v*` tags and
+  `workflow_dispatch` (`gh workflow run ci.yml`); ordinary branch pushes
+  and pull requests do not start it. Every run publishes four downloadable
+  archives (native player for Linux/Windows/macOS, Emscripten web bundle)
+  as workflow artifacts, and a tag run attaches the same archives to that
+  tag's GitHub Release. Use a manual run to prove the gate.
 - **CI verification order (all future changes): run the Linux pipeline
   first and fix anything it finds; only if Linux passes run the Windows
   pipeline; only if Windows passes run the macOS pipeline.** Linux is the

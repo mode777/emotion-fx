@@ -96,6 +96,26 @@ verified manually per desktop platform — CI runners have no real display.
 Checklist: launch `build/player examples/hello`, confirm a window opens with
 frame logs on stdout and clean exit 0 on close after the 60-frame auto-quit.
 
+## Continuous integration
+
+CI is the four-target gate (Windows, Linux, macOS, Emscripten). It is
+**not** run on every push: the workflow triggers on version tags (`v*`)
+and on manual dispatch only (ADR 0023). The smoke suite, golden-image
+checks, and web comparison harness all run inside those triggered runs.
+
+```sh
+gh workflow run ci.yml            # start the full gate on the current ref
+gh run list --workflow ci.yml     # list runs and their status
+```
+
+Every completed run publishes four downloadable archives — the native
+player for Linux, Windows, and macOS, plus the Emscripten web bundle
+(HTML + JS + wasm + data) — under the run's **Artifacts**. A run triggered
+by a `v*` tag additionally creates a GitHub Release for that tag with the
+same four archives attached, so tagged versions are directly downloadable
+from the release page. Manual runs use a `dev-<sha>` version token in the
+archive names; tag runs use the tag name.
+
 ## Notes
 
 - Dependencies are vendored and pinned in `vendor/` (see `vendor/README.md`);
