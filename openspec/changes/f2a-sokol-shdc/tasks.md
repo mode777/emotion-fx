@@ -16,8 +16,8 @@ Behavior gates: the native golden jobs per the `verification` spec.
 
 ## 3. Native golden gates
 
-- [ ] 3.1 Verify the Windows (D3D11/WARP) golden job passes — quads render, all six goldens within tolerance
-- [ ] 3.2 Verify the macOS (Metal) golden job passes — quads render, all six goldens within tolerance
+- [x] 3.1 Verify the Windows (D3D11/WARP) golden job passes — quads render, all six goldens within tolerance
+- [x] 3.2 Verify the macOS (Metal) golden job passes — quads render, all six goldens within tolerance
 
 ## 4. Docs
 
