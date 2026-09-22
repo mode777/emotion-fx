@@ -116,6 +116,18 @@ endif()
 
 option(EFX_BUILD_DEV_HARNESS "Build the temporary dev harness (F1 implementation aid)" OFF)
 
+# regenerate shaders/quad.h when the pinned sokol-shdc binary is provided:
+#   cmake -B build -DEFX_SHDC=/path/to/sokol-shdc ...
+set(EFX_SHDC "" CACHE FILEPATH "Path to the pinned sokol-shdc binary (regenerates shaders/quad.h)")
+if(EFX_SHDC)
+    add_custom_target(regen_shaders
+        COMMAND ${EFX_SHDC} -i ${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.glsl
+                -o ${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.h
+                --slang glsl410:glsl300es:hlsl4:metal_macos -f sokol_impl
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.glsl
+        COMMENT "Regenerating shaders/quad.h via sokol-shdc")
+endif()
+
 enable_testing()
 add_subdirectory(tests)
 

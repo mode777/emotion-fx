@@ -9,6 +9,7 @@ replacing the snapshot and editing the table below.
 | `sokol/` | floooh/sokol | master @ `2e75443dbd4940b5aa8d76a8e479f8e4b270b9a3` | https://github.com/floooh/sokol (only `sokol_app.h`, `sokol_gfx.h`, `sokol_glue.h`) |
 | `quickjs-ng/` | quickjs-ng/quickjs | v0.17.0 (QJS 0.17.0) | https://github.com/quickjs-ng/quickjs, release tarball `v0.17.0.tar.gz` |
 | `stb/` | nothings/stb | master @ `2c980bb59875b0d32144a71867fbdebb2f77cd20` (`stb_image` v2.30, `stb_image_write` v1.16) | https://github.com/nothings/stb (only `stb_image.h`, `stb_image_write.h`) |
+| — (tool, not vendored) | floooh/sokol-tools-bin | master @ `11d0cf678105d614d675e6d9bd2aaf3eeff12f8c` (2026-08-29) | https://github.com/floooh/sokol-tools-bin (`bin/linux/sokol-shdc`) — generation-time tool for `shaders/quad.h`; never linked into the player |
 
 Notes:
 
@@ -24,6 +25,15 @@ Notes:
 - GLM is a recorded future dependency (math decision from F1); it is
   deliberately NOT vendored yet — first use is F3 (see
   `openspec/changes/f1-player-skeleton/design.md`, D6).
+- sokol-shdc (ADR 0021) compiles `shaders/quad.glsl` into the committed
+  `shaders/quad.h`. The tool is used at author time only; the player
+  build never needs it (offline policy intact). Regeneration: download
+  the pinned sokol-tools-bin revision, run
+  `sokol-shdc -i shaders/quad.glsl -o shaders/quad.h --slang glsl410:glsl300es:hlsl4:metal_macos -f sokol_impl`,
+  and commit the diff. Source-snapshot vendoring was evaluated and
+  rejected: sokol-tools has no CMake build and pulls an 8-submodule
+  dependency graph (glslang, SPIRV-Tools/Cross, tint, ...) for a
+  generation-time-only tool.
 - stb is vendored for golden-image PNG I/O (F2 verification harness):
   `stb_image_write` encodes captured frames, `stb_image` decodes committed
   goldens for comparison. Both are single-header public-domain/MIT; the

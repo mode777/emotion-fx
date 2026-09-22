@@ -31,19 +31,29 @@ Decision record: `docs/decisions/0021-sokol-shdc-canned-shaders.md`
 
 ## Decisions
 
-### D1 — Compile sokol-shdc from a vendored source snapshot as a CMake host tool
+### D1 — Pinned sokol-shdc binary generates the committed header (apply resolution)
 
-The sokol-tools sources are vendored under `vendor/sokol-tools/` (pinned
-snapshot, recorded in `vendor/README.md` per ADR 0006) and built as a
-CMake host-tool target (`shdc`), then invoked via `add_custom_command` to
-generate `shaders/quad.h` from `shaders/quad.glsl` at build time. The
-generated header is committed so ordinary builds do not need to rebuild
-the tool, and a CMake target regenerates it when the source changes.
+> **Resolved during apply:** D1 was originally written as "compile
+> sokol-shdc from a vendored source snapshot as a CMake host tool".
+> Inspection showed sokol-tools has **no CMake build** and pulls an
+> 8-submodule dependency graph (glslang, SPIRV-Tools/Cross, tint, fmt,
+> ...) — impractical for a generation-time-only tool. Resolution: the
+> compiler is the **pinned sokol-tools-bin revision**
+> (`11d0cf678105d614d675e6d9bd2aaf3eeff12f8c`, recorded in
+> `vendor/README.md` with the regeneration procedure); the generated
+> `shaders/quad.h` is committed, so the player build never needs the
+> tool and stays offline. ADR 0021 was amended accordingly (its
+> "rejected alternatives" entry now records the source-graph option as
+> the rejected one). The decision's invariant is unchanged: one GLSL
+> source, generated header is the only shader artifact in the build.
 
-*Rejected:* prebuilt binaries from sokol-tools-bin — binary blobs
-in-repo and a download/trust step conflict with the vendored-source
-policy. *Rejected:* keeping hand-written sources — that is the defect
-being fixed.
+`shaders/quad.h` is generated from `shaders/quad.glsl` by the pinned
+sokol-shdc (`-f sokol_impl`, slangs `glsl410:glsl300es:hlsl4:metal_macos`)
+and committed; regeneration follows the documented procedure in
+`vendor/README.md`.
+
+*Rejected:* keeping hand-written sources — that is the defect being
+fixed. *Rejected:* source-graph vendoring — see above.
 
 ### D2 — Single GLSL source, sokol-shdc emits all native backends
 

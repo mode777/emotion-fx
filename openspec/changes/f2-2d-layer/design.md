@@ -212,6 +212,15 @@ no drawing). The docs/js-api.md F2 section is rewritten and F5's
 provisional sample refreshed in the same change as required by the js-api
 spec.
 
+## Addendum (f2a-sokol-shdc)
+
+The hand-written shader source strings and manual `sg_shader_desc`
+wiring described implicitly by D2/D10 were **superseded by
+`f2a-sokol-shdc`** (ADR 0021): `shaders/quad.glsl` + the generated
+`shaders/quad.h` now carry the canned quad shader for all native
+backends. The blend-equation pipelines (three variants) and all D2
+semantics are unchanged.
+
 ## Open Questions
 
 None — the deferred items assigned to F2 (tolerance, CI determinism, emsdk

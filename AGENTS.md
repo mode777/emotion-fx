@@ -63,7 +63,7 @@ implements.
 | F1 | Player skeleton | CMake + vendored Sokol/QuickJS, window, resource root, `main.js` hooks, `--script` run mode | Builds on Win/Linux/macOS/Emscripten; script smoke test crosses the JS/C boundary and exits 0 on each | done |
 | F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | incomplete: GLCORE/GLES3 verified; D3D11/Metal quads + web GC blocked (see f2a/f2b) |
 | F3 | 3D core | Camera, mesh slots, `drawMesh`, matrix math, depth test, vertex colors, procedural primitives | Golden images + math unit tests | planned |
-| F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); canned-shader strategy settled here at the latest | Golden images + lighting unit tests against a CPU reference implementation | planned |
+| F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); F4 lighting shaders reuse the sokol-shdc pipeline (strategy settled in F2, ADR 0021) | Golden images + lighting unit tests against a CPU reference implementation | planned |
 | F5 | Render targets + post FX | RTT, fullscreen-quad passes, color filter, blur | Golden images | planned |
 | F6 | Resource packaging | Zip resource root, glTF 2.0 asset import — meshes, images, skins, animation clips (profile decided here), interactive REPL | Script tests load assets from a zip; REPL exercised via piped stdin | planned |
 | F7 | Skinning + animation | CPU skinning into a mesh slot, skeleton/animation import, play/pause/blend | FK joint-transform tests vs CPU reference + golden images | planned |
@@ -71,7 +71,7 @@ implements.
 
 Deferred cross-cutting decisions settle inside specific milestones, not
 before: golden-image tolerance + CI determinism (incl. emsdk pinning) in
-F2, canned-shader strategy by F4 at the latest, glTF import profile in
+F2 (done: tolerance/determinism + canned-shader strategy), glTF import profile in
 F6. F1's deferred set (toolchain, quickjs flavor, math library) is
 settled — see `docs/decisions/`.
 
@@ -120,9 +120,11 @@ rayjs (QuickJS integration + stripping QuickJS for cross-platform).
 
 ## Not yet decided
 
-Golden-image tolerance and CI determinism (F2), the canned-shader
-strategy (by F4 at the latest), and the glTF import profile (F6) are
-open — settle them via OpenSpec proposals, not by silently picking
-defaults. The Roadmap section assigns each deferred decision a
-latest-settling milestone. The glTF 2.0 import format itself is pinned
+Golden-image tolerance and CI determinism are settled (F2, ADR 0020),
+as is the canned-shader strategy (settled early in F2 via
+`f2a-sokol-shdc`, ADR 0021 — canned shaders are single-source GLSL in
+`shaders/*.glsl`, compiled with pinned sokol-shdc). The glTF import
+profile (F6) remains open — settle it via an OpenSpec proposal, not by
+silently picking defaults. The Roadmap section assigns each deferred
+decision a latest-settling milestone. The glTF 2.0 import format itself is pinned
 in the roadmap; only the profile remains open.

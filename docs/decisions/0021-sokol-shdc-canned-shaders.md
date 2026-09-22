@@ -20,13 +20,15 @@ points, attribute semantics and resource bindings. Full process record:
 ## Decision
 
 All engine canned shaders are written **once, in sokol GLSL conventions**,
-in `shaders/*.glsl`, and compiled with **vendored sokol-shdc** into
-committed C headers at build time; `sg_shader_desc` wiring for these
-shaders comes exclusively from the generated headers. Hand-written shader
-sources or hand-assembled desc wiring for backend flavors MUST NOT be
-added. The tool is vendored as a pinned source snapshot and built as a
-CMake host tool (build-time only — never linked into the player), keeping
-builds offline per ADR 0006.
+in `shaders/*.glsl`, and compiled with **sokol-shdc** into committed C
+headers; `sg_shader_desc` wiring for these shaders comes exclusively from
+the generated headers. Hand-written shader sources or hand-assembled desc
+wiring for backend flavors MUST NOT be added. The compiler is pinned by
+revision (sokol-tools-bin) and used at author time only — the generated
+header is committed, so the player build never invokes it and stays
+offline per ADR 0006. (Compiling shdc from source was evaluated and
+rejected: no CMake build and an 8-submodule dependency graph for a
+generation-time tool.)
 
 ## Consequences
 
@@ -45,9 +47,11 @@ builds offline per ADR 0006.
 - **Hand-written per-backend sources** (F2's original approach): produced
   the D3D11/Metal silent no-op defect; every new shader multiplies the
   maintenance surface by the backend count.
-- **Prebuilt sokol-tools-bin binaries**: binary blobs in-repo and a
-  download/trust step conflict with the vendored-source snapshot policy
-  (ADR 0006).
+- **Vendoring the full sokol-tools source graph** (initial choice):
+  no CMake build upstream and an 8-submodule dependency graph
+  (glslang, SPIRV-Tools/Cross, tint, ...) for a generation-time-only
+  tool — maintenance and repo weight vastly exceed the benefit; the
+  committed generated header keeps builds hermetic either way.
 - **Runtime shader compilation from GLSL**: contradicts the fixed-function
   consumer contract (ADR 0015) and adds a runtime compiler dependency no
   target needs.
