@@ -1,10 +1,11 @@
 # EmotionFX JavaScript API Reference
 
-**Status:** F1 and F2 are implemented (current behavior). Everything from F3
-onward is a provisional contract — names and signatures may be reshaped by the
-change that delivers them (every API change must update this document in the
-same change). See `vision.md` for product goals and
-`openspec/specs/feature-roadmap` for the milestone ladder.
+**Status:** F1 (including explicit lifecycle hook registration) and F2 are
+implemented (current behavior). Everything from F3 onward is a provisional
+contract — names and signatures may be reshaped by the change that delivers
+them (every API change must update this document in the same change). See
+`vision.md` for product goals and `openspec/specs/feature-roadmap` for the
+milestone ladder.
 
 ## Overview
 
@@ -42,8 +43,9 @@ Every rule below traces to vision.md or to F1's implemented behavior.
 
 - **Namespace** (F1 implementation): engine functions are members of the
   global `efx` object — `efx.log(...)`, `efx.quit(...)` — never free globals
-  and never behind imports. The only free globals a script interacts with are
-  the lifecycle hooks it *provides* (see below).
+  and never behind imports. Frame callbacks are registered through
+  `efx.registerUpdateHook`/`efx.registerRenderHook`; global `update`/`render`
+  functions remain as load-time sugar (see below).
 - **Naming**: camelCase, verb-first. `set*`/`get*` configure engine state,
   `draw*` record into the display list, `make*` build data in JS,
   `load*`/`create*` fetch or upload resources and return resource objects.
@@ -78,33 +80,44 @@ Every rule below traces to vision.md or to F1's implemented behavior.
 ## Lifecycle hooks
 
 The entry script is `main.js` at the resource root (a zip in F6+).
-**Loading `main.js` is the implicit init**: the engine is fully ready —
-window, GL context, the `efx` namespace, the bundled high-level layer —
-*before* the script executes, and top-level code is where setup happens.
-There is no separate `init()` hook.
+**Loading `main.js` is the implicit init**: the `efx` namespace and every
+engine function are ready — the rendering surface is initialized when the
+frame loop starts and is not script-visible at load time — *before* the
+script executes, and top-level code is where setup happens. There is no
+separate `init()` hook.
 
 Frame callbacks are registered explicitly and stack in registration order:
 
 ```js
-// provisional — target contract (ADR 0016)
+// F1 · C · current (ADR 0016)
 const offUpdate = efx.registerUpdateHook(dt => { ... }); // dt: seconds since previous frame
 const offRender = efx.registerRenderHook(() => { ... });
 
 offUpdate(); // optional unsubscribe
 ```
 
+```js
+// F1 · C · current
+efx.registerUpdateHook(fn)   // fn(dt) — dt: seconds since previous frame (0 on the first frame)
+efx.registerRenderHook(fn)   // fn() — no arguments
+```
+
+- Both functions require a function argument; anything else throws
+  `TypeError`. Each returns an **unsubscribe function**; calling it removes
+  that registration and is idempotent.
 - Update hooks run before render hooks, once per frame, in registration
-  order; an exception in any hook (or at load time) stops the run and exits
+  order. An exception in any hook (or at load time) stops the run and exits
   non-zero.
-- **F1 current behavior:** the engine picks up global `update`/`render`
-  functions (called with no arguments). These remain supported as
-  load-time sugar — equivalent to a registration at the end of loading
-  `main.js` — so F1 scripts keep working unchanged.
-- `registerUpdateHook`/`registerRenderHook`, the `dt` argument, and the
-  readiness-before-load ordering remain provisional: F2 did not deliver
-  them (hook registration was out of its scope), so they stay pending a
-  future runtime change. The REPL (F6) registers through the same
-  functions — the reason registration, not globals, is the normative model.
+- **Global `update`/`render` remain supported as load-time sugar:** if the
+  script defines them, the engine registers them after evaluation in load
+  order, so they run after any hooks registered during evaluation. Scripts
+  using only the globals keep working unchanged; the only difference is that
+  the global `update` now also receives `dt`.
+- The REPL (F6) registers and unregisters through the same functions — the
+  reason registration, not globals, is the normative model.
+- The engine's readiness guarantee covers the script-visible API; moving
+  window/GL-context creation ahead of `main.js` evaluation is deferred
+  (ADR 0016, amended).
 
 ## Resource & memory model
 
@@ -190,14 +203,37 @@ efx.args()
 Returns a `string[]` of the arguments the host passed to the script run
 (the `--script <file> [args...]` tail). Empty array when none were given.
 
-F1 connects frame callbacks via the global `update`/`render` functions
-(still supported as load-time sugar — see
-[Lifecycle hooks](#lifecycle-hooks)); the provisional
-`efx.registerUpdateHook`/`efx.registerRenderHook` pair is the target
-contract.
+```js
+// F1 · C · current
+efx.registerUpdateHook(fn)   // fn(dt); returns an unsubscribe function
+efx.registerRenderHook(fn)   // fn();   returns an unsubscribe function
+```
+
+F1 connects frame callbacks through explicit registration (ADR 0016) — see
+[Lifecycle hooks](#lifecycle-hooks) for the stacking/`dt`/unsubscribe rules.
+The global `update`/`render` functions remain supported as load-time sugar,
+so both of these are current:
 
 ```js
-// main.js — F1 sample (current behavior only)
+// main.js — F1 sample (explicit registration)
+let frames = 0;
+
+const offUpdate = efx.registerUpdateHook(function (dt) {
+    frames++;
+    if (frames === 1) {
+        efx.log('hello from efx ' + efx.args().join(' '));
+    }
+    if (frames >= 60) {
+        offUpdate();
+        efx.quit(0); // exits the player with code 0
+    }
+});
+
+efx.registerRenderHook(function () {});
+```
+
+```js
+// main.js — F1 sample (global sugar, still current)
 let frames = 0;
 
 function update() {
@@ -206,7 +242,7 @@ function update() {
         efx.log('hello from efx ' + efx.args().join(' '));
     }
     if (frames >= 60) {
-        efx.quit(0); // exits the player with code 0
+        efx.quit(0);
     }
 }
 
@@ -289,7 +325,7 @@ const logo = efx.createTexture(
 efx.setClearColor([0.08, 0.09, 0.12, 1]);
 efx.setCamera2D({ frame: [640, 480] }); // virtual 640×480 frame, view centered
 
-function render() { // global hook (registration is a future runtime change)
+function render() { // global hook (or efx.registerRenderHook(fn))
     efx.setBlendMode('alpha');
     efx.drawQuad(64, 64, 128, 128, logo); // textured sprite
     efx.setBlendMode('additive');
@@ -574,7 +610,7 @@ section (or an open question below):
 | REPL console mode | F6 (drives the same `efx` namespace) |
 | Skinning and animations | F7 |
 | High-level functions in pure JS (`drawModel`, `drawText`) | F8 |
-| Callbacks for update and rendering | Lifecycle hooks (explicit registration, ADR 0016) |
+| Callbacks for update and rendering | F1 (Lifecycle hooks — explicit registration, ADR 0016) |
 | Low/mid C + high-level JS layering | Overview (two layers), every entry tag |
 | No browser/Node dependencies (incl. transitively) | Conventions (Dependencies) |
 | Handles (resource objects) or pre-allocated slots for unmanaged resources | Resource & memory model |
@@ -596,9 +632,6 @@ API for them:
   the F6 change settles only the *profile*: .glb vs .gltf container,
   allowed extensions, image embedding. Until then `load*` signatures stay
   provisional.
-- **Hook registration + `dt` delivery** — target contract (ADR 0016);
-  F2 did not deliver it (out of scope), so it stays pending a future
-  runtime change; F1 globals remain as load-time sugar.
 - **Procedural rigs** — F7 bundles skins/skeletons/clips at *import* only;
   constructing a rig procedurally (from `createMeshData` + skeleton data)
   has no path yet. Deferred until a concrete need appears.

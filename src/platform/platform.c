@@ -103,9 +103,10 @@ static void efx_frame_cb(void) {
 #if defined(__EMSCRIPTEN__)
     fprintf(stderr, "efx: frame %d\n", g_frame);
 #endif
+    double dt = (g_frame == 1) ? 0.0 : sapp_frame_duration();
     efx_render_begin_frame();
     efx_render_set_viewport(sapp_width(), sapp_height());
-    if (g_hooks.on_frame && g_hooks.on_frame(g_hooks.ud)) {
+    if (g_hooks.on_frame && g_hooks.on_frame(g_hooks.ud, dt)) {
 #if defined(__EMSCRIPTEN__)
     
 #endif

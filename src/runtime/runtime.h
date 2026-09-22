@@ -13,7 +13,7 @@ void efx_runtime_destroy(efx_runtime *rt);
 int efx_runtime_eval_file(efx_runtime *rt, const char *path);
 int efx_runtime_eval_string(efx_runtime *rt, const char *name, const char *code);
 void efx_runtime_pick_hooks(efx_runtime *rt, int *has_update, int *has_render);
-int efx_runtime_call_hook(efx_runtime *rt, int update_not_render);
+int efx_runtime_call_hook(efx_runtime *rt, int update_not_render, double dt);
 
 int efx_runtime_quit_requested(const efx_runtime *rt);
 int efx_runtime_quit_code(const efx_runtime *rt);

@@ -74,6 +74,7 @@ if(EMSCRIPTEN)
     add_web_test(web_root_missing_dir missing EXPECT nonzero EXPECT_ERR "not a directory" ROOT ${F}/no_such_dir)
     add_web_test(web_root_frame ${WEBF}/root_frame EXPECT 0 EXPECT_OUT "frame-1")
     add_web_test(web_root_hooks_order ${WEBF}/root_hooks_order EXPECT 0 EXPECT_OUT "u1.*r1.*u2")
+    add_web_test(web_explicit_hooks ${WEBF}/root_explicit_hooks EXPECT 0 EXPECT_OUT "u1.*u2.*r1.*u2.*r2.*done")
     add_web_test(web_root_hook_throw ${WEBF}/root_hook_throw EXPECT nonzero EXPECT_ERR "uncaught exception: hook boom")
     add_web_test(web_root_eval_throw ${WEBF}/root_eval_throw EXPECT nonzero EXPECT_ERR "intentional-smoke-throw")
     add_web_test(web_log ${S}/s_log.js EXPECT 0 EXPECT_OUT "smoke-log-ok")
@@ -103,7 +104,7 @@ endforeach()
 if(NOT EMSCRIPTEN)
 foreach(CASE
     white quad_record camera_snapshot src_oob budget texture_lifecycle
-    blend_snapshot default_camera)
+    blend_snapshot default_camera hooks_registration)
     add_unit_test(efx_api_tests ${CASE})
 endforeach()
 endif()
@@ -167,4 +168,10 @@ if(EFX_BUILD_DEV_HARNESS AND NOT EMSCRIPTEN)
     add_harness_test(hooks_throw_stops ${S}/h_throw.js
         ""
         "uncaught exception: hook boom.*error=1")
+    add_harness_test(hooks_explicit_order ${S}/h_explicit_order.js
+        "eu1.*er1.*eu3-quit"
+        "hooks update=1 render=1.*quit=1 code=5 error=0")
+    add_harness_test(hooks_explicit_unsub ${S}/h_explicit_unsub.js
+        "a.*unsub"
+        "hooks update=1 render=0.*quit=1 code=0 error=0")
 endif()

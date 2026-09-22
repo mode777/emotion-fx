@@ -1,6 +1,8 @@
 # 0016 — Lifecycle via explicit hook registration; loading main.js is the implicit init
 
-Status: Accepted (2026-09, change `js-api-reference`)
+Status: Accepted (2026-09, change `js-api-reference`; amended 2026-09,
+change `explicit-hook-registration`: the readiness guarantee is scoped to
+the script-visible API)
 Supersedes: the `init()` hook portion of the D9 sketch in
 `openspec/changes/archive/2026-09-21-js-api-reference/design.md`
 
@@ -26,11 +28,14 @@ readiness before script evaluation, top-level code *is* the init.
   Each registration returns an **unsubscribe function** — essential for
   REPL iteration, where re-registering would otherwise accumulate stale
   hooks.
-- **Loading `main.js` is the implicit init.** Runtime contract: the engine
-  is fully ready — window, GL context, the `efx` namespace, the bundled
-  high-level layer — *before* `main.js` executes (F1's current order flips:
-  context setup moves before script evaluation). Top-level code is setup;
-  the separate `init()` hook is dropped as redundant.
+- **Loading `main.js` is the implicit init.** Runtime contract: the
+  script-visible engine — the `efx` namespace, every API function, and the
+  bundled high-level layer — is ready *before* `main.js` executes; top-level
+  code is setup, and the separate `init()` hook is dropped as redundant.
+  The rendering surface is initialized when the frame loop starts and is not
+  script-visible at load time, so moving window/GL-context creation ahead of
+  evaluation is **not** required for this contract and stays deferred (see
+  Consequences).
 - **F1's global `update`/`render` remain supported as load-time sugar**: if
   defined after evaluation, the engine registers them in load order. F1
   examples, the smoke suite, and the player-runtime gate contract stay
@@ -40,10 +45,11 @@ readiness before script evaluation, top-level code *is* the init.
 
 ## Consequences
 
-- Player runtime: hook pickup becomes dynamic (a list, not a one-time
-  property read); the readiness-before-eval ordering is a one-time runtime
-  change delivered together with the registration pair. F2 scoped hook
-  registration out, so this remains pending a future runtime change.
+- Player runtime: hook pickup is a dynamic list, not a one-time property
+  read; the registration pair shipped in the `explicit-hook-registration`
+  change. The readiness-before-eval reordering of window/GL-context creation
+  remains deferred — it is not script-visible and can be revisited if a
+  future feature needs load-time GPU access.
 - Callback count is unbounded and order matters; an exception in any hook
   halts the run (existing error contract applies).
 - REPL sessions that re-register accumulate hooks; unsubscribe (or session

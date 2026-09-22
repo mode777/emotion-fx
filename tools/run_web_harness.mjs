@@ -143,6 +143,7 @@ const F = '/fixtures';
 const scenarios = [
     { name: 'boot_ok', root: `${F}/root_ok`, exit: 0, consoleIncludes: ['entry-ok'], expectLoopStop: true },
     { name: 'one_frame_quit', root: `${F}/web/root_frame`, exit: 0, consoleIncludes: ['frame-1'], expectLoopStop: true },
+    { name: 'explicit_hooks', root: `${F}/web/root_explicit_hooks`, exit: 0, consoleIncludes: ['u1', 'u2', 'r1', 'done'], expectLoopStop: true },
     { name: 'hook_throw', root: `${F}/web/root_hook_throw`, exit: 1, consoleIncludes: ['uncaught exception: hook boom'], expectLoopStop: true },
     { name: 'eval_throw', root: `${F}/web/root_eval_throw`, exit: 1, consoleIncludes: ['intentional-smoke-throw'], expectLoopStop: true },
     { name: 'no_entry', root: `${F}/root_no_entry`, exit: 1, consoleIncludes: ['no main.js in resource root'], expectLoopStop: true },
