@@ -8,7 +8,7 @@
 function __efxState() {
     var st = globalThis['__efx_state'];
     if (!st) {
-        st = { api: null, quitSentinel: null, update: null, render: null, started: false };
+        st = { api: null, quitSentinel: null, updateHooks: [], renderHooks: [], started: false };
         globalThis['__efx_state'] = st;
     }
     return st;
@@ -109,25 +109,48 @@ function __efxEnsureApi() {
     }
     var bridge = Module;
 
-    st.dispatch = function (which) {
-        var h = which ? st.update : st.render;
-        if (typeof h !== 'function') {
-            return 0;
-        }
-        try {
-            h();
-            return 0;
-        } catch (e) {
-            if (st.quitSentinel !== null && e === st.quitSentinel) {
-                return 1;
+    st.dispatch = function (which, dt) {
+        var hooks = which ? st.updateHooks : st.renderHooks;
+        for (var i = 0; i < hooks.length; i++) {
+            var entry = hooks[i];
+            if (!entry.active) {
+                continue;
             }
-            bridge['_efx_bridge_set_error']();
-            __efxReportError(e);
-            __efxSyncExit();
-            return 2;
+            try {
+                if (which) {
+                    entry.fn(dt);
+                } else {
+                    entry.fn();
+                }
+            } catch (e) {
+                if (st.quitSentinel !== null && e === st.quitSentinel) {
+                    return 1;
+                }
+                bridge['_efx_bridge_set_error']();
+                __efxReportError(e);
+                __efxSyncExit();
+                return 2;
+            }
         }
+        return 0;
     };
     globalThis['__efxDispatchHook'] = st.dispatch;
+
+    // explicit hook registration (ADR 0016): entries are marked inactive on
+    // unsubscribe instead of spliced, so a hook may unsubscribe itself while
+    // it is running (desktop parity, design D1)
+    function makeRegister(which) {
+        return function (fn) {
+            if (typeof fn !== 'function') {
+                throw new TypeError('hook must be a function');
+            }
+            var entry = { fn: fn, active: true };
+            (which ? st.updateHooks : st.renderHooks).push(entry);
+            return function () {
+                entry.active = false;
+            };
+        };
+    }
 
     function EfxImageData(id) {
         this.__id = id;
@@ -211,6 +234,8 @@ function __efxEnsureApi() {
             }
             return out;
         },
+        registerUpdateHook: makeRegister(1),
+        registerRenderHook: makeRegister(0),
         setClearColor: function (color) {
             if (arguments.length < 1) {
                 throw new TypeError('setClearColor requires a [r,g,b,a] array');
@@ -562,8 +587,12 @@ function __efxBoot() {
         __efxNodeExit();
         return;
     }
-    st.update = (hooks && typeof hooks.u === 'function') ? hooks.u : null;
-    st.render = (hooks && typeof hooks.r === 'function') ? hooks.r : null;
+    if (hooks && typeof hooks.u === 'function') {
+        st.updateHooks.push({ fn: hooks.u, active: true });
+    }
+    if (hooks && typeof hooks.r === 'function') {
+        st.renderHooks.push({ fn: hooks.r, active: true });
+    }
     __efxSyncExit();
     var dom = false;
     try {

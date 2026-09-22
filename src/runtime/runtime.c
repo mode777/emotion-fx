@@ -14,11 +14,45 @@ struct efx_runtime {
     JSRuntime *js_rt;
     JSContext *ctx;
     int in_error;
-    JSValue hook_update;
-    JSValue hook_render;
-    int has_update;
-    int has_render;
+    int hooks_sugar_done; /* global update/render registered once after eval */
 };
+
+int efx_hooks_append(JSContext *ctx, struct efx_hook_list *list, JSValueConst fn) {
+    if (list->count == list->cap) {
+        int cap = list->cap ? list->cap * 2 : 4;
+        struct efx_hook_entry *grown =
+            realloc(list->entries, (size_t)cap * sizeof(*grown));
+        if (!grown) {
+            return -1;
+        }
+        list->entries = grown;
+        list->cap = cap;
+    }
+    int idx = list->count++;
+    list->entries[idx].fn = JS_DupValue(ctx, fn);
+    list->entries[idx].active = 1;
+    return idx;
+}
+
+int efx_hooks_active(const struct efx_hook_list *list) {
+    int n = 0;
+    for (int i = 0; i < list->count; i++) {
+        if (list->entries[i].active) {
+            n++;
+        }
+    }
+    return n;
+}
+
+void efx_hooks_free_all(JSContext *ctx, struct efx_hook_list *list) {
+    for (int i = 0; i < list->count; i++) {
+        JS_FreeValue(ctx, list->entries[i].fn);
+    }
+    free(list->entries);
+    list->entries = NULL;
+    list->count = 0;
+    list->cap = 0;
+}
 
 static char *dup_string(const char *s) {
     size_t n = strlen(s) + 1;
@@ -103,8 +137,6 @@ efx_runtime *efx_runtime_new(char *const *args, int arg_count) {
     }
     rt->js_rt = JS_NewRuntime();
     rt->ctx = JS_NewContext(rt->js_rt);
-    rt->hook_update = JS_UNDEFINED;
-    rt->hook_render = JS_UNDEFINED;
     rt->host.quit_sentinel = JS_NewObject(rt->ctx);
     rt->host.quit_code = 0;
     if (arg_count > 0 && args) {
@@ -122,6 +154,8 @@ efx_runtime *efx_runtime_new(char *const *args, int arg_count) {
         JS_CFUNC_DEF("log", 1, efx_js_log),
         JS_CFUNC_DEF("quit", 1, efx_js_quit),
         JS_CFUNC_DEF("args", 0, efx_js_args),
+        JS_CFUNC_DEF("registerUpdateHook", 1, efx_js_registerUpdateHook),
+        JS_CFUNC_DEF("registerRenderHook", 1, efx_js_registerRenderHook),
         JS_CFUNC_DEF("setClearColor", 1, efx_js_setClearColor),
         JS_CFUNC_DEF("setCamera2D", 1, efx_js_setCamera2D),
         JS_CFUNC_DEF("createImageData", 1, efx_js_createImageData),
@@ -146,8 +180,8 @@ void efx_runtime_destroy(efx_runtime *rt) {
     if (!rt) {
         return;
     }
-    JS_FreeValue(rt->ctx, rt->hook_update);
-    JS_FreeValue(rt->ctx, rt->hook_render);
+    efx_hooks_free_all(rt->ctx, &rt->host.update_hooks);
+    efx_hooks_free_all(rt->ctx, &rt->host.render_hooks);
     JS_FreeValue(rt->ctx, rt->host.quit_sentinel);
     if (rt->host.has_white_texture) {
         JS_FreeValue(rt->ctx, rt->host.white_texture);
@@ -186,35 +220,57 @@ int efx_runtime_eval_string(efx_runtime *rt, const char *name, const char *code)
 }
 
 void efx_runtime_pick_hooks(efx_runtime *rt, int *has_update, int *has_render) {
-    JSValue glob = JS_GetGlobalObject(rt->ctx);
-    JS_FreeValue(rt->ctx, rt->hook_update);
-    JS_FreeValue(rt->ctx, rt->hook_render);
-    rt->hook_update = JS_GetPropertyStr(rt->ctx, glob, "update");
-    rt->hook_render = JS_GetPropertyStr(rt->ctx, glob, "render");
-    JS_FreeValue(rt->ctx, glob);
-    rt->has_update = JS_IsFunction(rt->ctx, rt->hook_update) > 0;
-    rt->has_render = JS_IsFunction(rt->ctx, rt->hook_render) > 0;
+    if (!rt->hooks_sugar_done) {
+        rt->hooks_sugar_done = 1;
+        JSValue glob = JS_GetGlobalObject(rt->ctx);
+        JSValue u = JS_GetPropertyStr(rt->ctx, glob, "update");
+        JSValue r = JS_GetPropertyStr(rt->ctx, glob, "render");
+        if (JS_IsFunction(rt->ctx, u)) {
+            efx_hooks_append(rt->ctx, &rt->host.update_hooks, u);
+        }
+        if (JS_IsFunction(rt->ctx, r)) {
+            efx_hooks_append(rt->ctx, &rt->host.render_hooks, r);
+        }
+        JS_FreeValue(rt->ctx, u);
+        JS_FreeValue(rt->ctx, r);
+        JS_FreeValue(rt->ctx, glob);
+    }
     if (has_update) {
-        *has_update = rt->has_update;
+        *has_update = efx_hooks_active(&rt->host.update_hooks) > 0;
     }
     if (has_render) {
-        *has_render = rt->has_render;
+        *has_render = efx_hooks_active(&rt->host.render_hooks) > 0;
     }
 }
 
-int efx_runtime_call_hook(efx_runtime *rt, int update_not_render) {
-    int has = update_not_render ? rt->has_update : rt->has_render;
-    if (!has) {
-        return EFX_HOOK_OK;
+int efx_runtime_call_hook(efx_runtime *rt, int update_not_render, double dt) {
+    struct efx_hook_list *list =
+        update_not_render ? &rt->host.update_hooks : &rt->host.render_hooks;
+    for (int i = 0; i < list->count; i++) {
+        if (!list->entries[i].active) {
+            continue;
+        }
+        JSValue args[1];
+        int nargs = 0;
+        if (update_not_render) {
+            args[0] = JS_NewFloat64(rt->ctx, dt);
+            nargs = 1;
+        }
+        JSValue result = JS_Call(rt->ctx, list->entries[i].fn, JS_UNDEFINED,
+                                 nargs, args);
+        if (nargs) {
+            JS_FreeValue(rt->ctx, args[0]);
+        }
+        if (JS_IsException(result)) {
+            int rc = finish_exception(rt);
+            return rc == 0 ? EFX_HOOK_QUIT : EFX_HOOK_ERROR;
+        }
+        JS_FreeValue(rt->ctx, result);
+        if (rt->host.quit_requested) {
+            return EFX_HOOK_QUIT;
+        }
     }
-    JSValue hook = update_not_render ? rt->hook_update : rt->hook_render;
-    JSValue result = JS_Call(rt->ctx, hook, JS_UNDEFINED, 0, NULL);
-    if (JS_IsException(result)) {
-        int rc = finish_exception(rt);
-        return rc == 0 ? EFX_HOOK_QUIT : EFX_HOOK_ERROR;
-    }
-    JS_FreeValue(rt->ctx, result);
-    return rt->host.quit_requested ? EFX_HOOK_QUIT : EFX_HOOK_OK;
+    return EFX_HOOK_OK;
 }
 
 int efx_runtime_quit_requested(const efx_runtime *rt) {

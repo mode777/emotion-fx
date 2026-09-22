@@ -252,6 +252,59 @@ static int default_camera(void) {
     return 0;
 }
 
+/* explicit lifecycle hooks: registration order, dt, unsubscribe, sugar */
+static int hooks_registration(void) {
+    const char *code =
+        "globalThis.__hooksLog = [];"
+        "try { efx.registerUpdateHook(123); __hooksLog.push('NO-THROW'); }"
+        "catch (e) { __hooksLog.push('typeerror:' + (e instanceof TypeError)); }"
+        "globalThis.__off = efx.registerUpdateHook(function (dt) {"
+        "  __hooksLog.push('uA:' + (typeof dt === 'number' && isFinite(dt))); });"
+        "efx.registerUpdateHook(function () { __hooksLog.push('uB'); });"
+        "efx.registerRenderHook(function () { __hooksLog.push('r'); });"
+        "globalThis.update = function (dt) {"
+        "  __hooksLog.push('gU:' + (typeof dt === 'number' && isFinite(dt))); };"
+        "globalThis.render = function () { __hooksLog.push('gR'); };";
+    if (ok_js(code)) {
+        end_js();
+        return fail("hooks snippet");
+    }
+    int has_update = 0;
+    int has_render = 0;
+    efx_runtime_pick_hooks(g_rt, &has_update, &has_render);
+    if (!has_update || !has_render) {
+        end_js();
+        return fail("sugar hooks not picked up");
+    }
+    if (efx_runtime_call_hook(g_rt, 1, 0.5) != EFX_HOOK_OK ||
+        efx_runtime_call_hook(g_rt, 0, 0.5) != EFX_HOOK_OK) {
+        end_js();
+        return fail("hook dispatch returned an error");
+    }
+    /* unsubscribe is idempotent and removes the first hook */
+    if (efx_runtime_eval_string(g_rt, "unsub", "__off(); __off();") != 0) {
+        end_js();
+        return fail("unsubscribe snippet");
+    }
+    if (efx_runtime_call_hook(g_rt, 1, 0.25) != EFX_HOOK_OK) {
+        end_js();
+        return fail("post-unsubscribe dispatch");
+    }
+    const char *want =
+        "typeerror:true|uA:true|uB|gU:true|r|gR|uB|gU:true";
+    char verify[512];
+    snprintf(verify, sizeof(verify),
+             "if (__hooksLog.join('|') !== '%s')"
+             "  throw new Error('hook order: ' + __hooksLog.join('|'));",
+             want);
+    if (efx_runtime_eval_string(g_rt, "verify", verify) != 0) {
+        end_js();
+        return fail("hook order/dt mismatch");
+    }
+    end_js();
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: efx_api_tests <case>\n");
@@ -267,6 +320,7 @@ int main(int argc, char **argv) {
     if (!strcmp(c, "blend_snapshot")) return blend_snapshot();
     if (!strcmp(c, "default_camera")) return default_camera();
     if (!strcmp(c, "clear_color_js")) return clear_color_js();
+    if (!strcmp(c, "hooks_registration")) return hooks_registration();
     fprintf(stderr, "unknown case: %s\n", c);
     return 2;
 }

@@ -70,6 +70,61 @@ static JSValue generic_error(JSContext *ctx, const char *msg) {
     return JS_ThrowInternalError(ctx, "%s", msg);
 }
 
+/* --------------------------------------------- F1 lifecycle hooks */
+
+/* unsubscribe closure: magic selects the list (0 = update, 1 = render),
+   func_data[0] carries the stable entry index (design D1/D2) */
+static JSValue efx_js_unsubscribe(JSContext *ctx, JSValueConst this_val,
+                                  int argc, JSValueConst *argv, int magic,
+                                  JSValue *func_data) {
+    (void)this_val;
+    (void)argc;
+    (void)argv;
+    struct efx_host_state *h = host_state(ctx);
+    struct efx_hook_list *list = magic ? &h->render_hooks : &h->update_hooks;
+    int32_t idx = -1;
+    JS_ToInt32(ctx, &idx, func_data[0]);
+    if (idx >= 0 && idx < list->count) {
+        list->entries[idx].active = 0; /* idempotent: repeated calls are no-ops */
+    }
+    return JS_UNDEFINED;
+}
+
+static JSValue register_hook(JSContext *ctx, JSValueConst fn, int is_render) {
+    if (!JS_IsFunction(ctx, fn)) {
+        return type_error(ctx, "hook must be a function");
+    }
+    struct efx_host_state *h = host_state(ctx);
+    struct efx_hook_list *list = is_render ? &h->render_hooks : &h->update_hooks;
+    int idx = efx_hooks_append(ctx, list, fn);
+    if (idx < 0) {
+        return generic_error(ctx, "out of memory");
+    }
+    JSValue data = JS_NewInt32(ctx, idx);
+    JSValue unsub = JS_NewCFunctionData(ctx, efx_js_unsubscribe, 0,
+                                        is_render ? 1 : 0, 1, &data);
+    JS_FreeValue(ctx, data);
+    return unsub;
+}
+
+JSValue efx_js_registerUpdateHook(JSContext *ctx, JSValueConst this_val,
+                                  int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1) {
+        return type_error(ctx, "registerUpdateHook requires a function");
+    }
+    return register_hook(ctx, argv[0], 0);
+}
+
+JSValue efx_js_registerRenderHook(JSContext *ctx, JSValueConst this_val,
+                                  int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1) {
+        return type_error(ctx, "registerRenderHook requires a function");
+    }
+    return register_hook(ctx, argv[0], 1);
+}
+
 /* read a flat array (JS array or typed array) of exactly n floats;
    returns 0 ok, -1 wrong type (TypeError thrown), -2 wrong length or
    non-finite/out-of-range element (RangeError thrown) */

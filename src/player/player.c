@@ -56,12 +56,12 @@ static int run_script_mode(const char *path, char *const *args, int arg_count) {
     return exit_code;
 }
 
-int efx_player_frame(void *ud) {
+int efx_player_frame(void *ud, double dt) {
     efx_runtime *rt = (efx_runtime *)ud;
     if (efx_runtime_quit_requested(rt) || efx_runtime_in_error(rt)) {
         return 1;
     }
-    int r = efx_runtime_call_hook(rt, 1);
+    int r = efx_runtime_call_hook(rt, 1, dt);
     if (r != EFX_HOOK_OK) {
         return 1;
     }
@@ -69,7 +69,7 @@ int efx_player_frame(void *ud) {
     if (efx_runtime_quit_requested(rt) || efx_runtime_in_error(rt)) {
         return 1;
     }
-    r = efx_runtime_call_hook(rt, 0);
+    r = efx_runtime_call_hook(rt, 0, dt);
     if (r != EFX_HOOK_OK) {
         return 1;
     }
@@ -80,8 +80,8 @@ int efx_player_frame(void *ud) {
     return efx_runtime_quit_requested(rt) || efx_runtime_in_error(rt);
 }
 
-static int on_frame(void *ud) {
-    return efx_player_frame(ud);
+static int on_frame(void *ud, double dt) {
+    return efx_player_frame(ud, dt);
 }
 
 static int run_root_mode(const char *root, const efx_platform_capture *capture) {
