@@ -19,4 +19,4 @@
 
 - [x] 4.1 Run `npx openspec validate --change separate-pages-deploy --strict` and confirm the change passes
 - [x] 4.2 Commit and push the change on a branch and run a manual gate dispatch (`gh workflow run ci.yml --ref <branch>`); confirm the run is green with no `pages` job — the acceptance criterion this change exists for (previously this ref failed on `pages`)
-- [ ] 4.3 After the change reaches `main`, confirm the Pages workflow is dispatchable and deploys: `gh workflow view pages.yml`, then `gh workflow run pages.yml --ref main` and check the run succeeds and the Pages URL serves the built web player; also confirm a manual `pages.yml` dispatch from a feature branch skips the deploy job (no protected-environment failure)
+- [x] 4.3 After the change reaches `main`, confirm the Pages workflow is dispatchable and deploys: `gh workflow view pages.yml`, then `gh workflow run pages.yml --ref main` and check the run succeeds and the Pages URL serves the built web player; also confirm a manual `pages.yml` dispatch from a feature branch skips the deploy job (no protected-environment failure)
