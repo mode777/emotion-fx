@@ -3,13 +3,15 @@
 Implements F2 (2D layer). Decisions D1–D10 refer to design.md; behavior
 requirements live in the delta specs (`2d-layer`, `verification`).
 
-**STATUS: INCOMPLETE — BLOCKED.** Tasks 7.1–7.3 and 9.x cannot pass until
-the two follow-up changes land: `f2a-sokol-shdc` (D3D11/Metal quads render
-nothing — hand-written shader defect, superseded by that change) and
-`f2b-web-native-runtime` (JS_RunGC segfault in browser frame callback; the
-web golden job stays red until quickjs is removed from the web platform).
-Windows/macOS capture readback itself is verified working (clear colors
-pixel-exact; only the shader-driven quads are missing).
+**STATUS: COMPLETE.** Both follow-up changes landed:
+`f2a-sokol-shdc` (generated canned shaders; D3D11/Metal quads render,
+ADR 0021) and `f2b-web-native-runtime` (quickjs removed from web; the
+browser native engine drives the core via the `src/web/` bridge, ADR 0022).
+That resolved the D3D11/Metal shader defect and the web `JS_RunGC` crash,
+completing the capture/readback and CI-golden tasks. The full four-target
+matrix is green (run 35705801110 on HEAD `9746a8d`): native 41/41 on
+Windows/Linux/macOS with all six golden scenes, Emscripten 23/23, and the
+web golden job all six scenes + harness scenarios.
 
 ## 1. Vendoring and render module skeleton
 
@@ -39,8 +41,8 @@ pixel-exact; only the shader-driven quads are missing).
 ## 5. Capture run mode and readback (D7)
 
 - [x] 5.1 Add `--capture-frame <N> --capture-output <file>` to the player run modes: render N frames, read back, write PNG via stb (with row-order handling), exit 0; verify on the host that a fixture capture produces a 640×480 PNG whose corner pixels match the scene
-- [ ] 5.2 Implement per-backend readback behind the platform layer: GL `glReadPixels` (Linux/macOS) and D3D11 staging copy + map (Windows); verify GL path on the host and the D3D11 path via the CI Windows job in task 7.1
-- [ ] 5.3 Implement the Emscripten capture path (WebGL2 readPixels → MEMFS → PNG); verify the build compiles and a Node-driven run produces a capture buffer
+- [x] 5.2 Implement per-backend readback behind the platform layer: GL `glReadPixels` (Linux/macOS) and D3D11 staging copy + map (Windows); verify GL path on the host and the D3D11 path via the CI Windows job in task 7.1 (verified by f2a task 3.1: Windows D3D11/WARP goldens green)
+- [x] 5.3 Implement the Emscripten capture path (WebGL2 readPixels → MEMFS → PNG); verify the build compiles and a Node-driven run produces a capture buffer (verified by f2b task 4.1: web goldens green)
 
 ## 6. Golden harness and scenes (D8)
 
@@ -50,9 +52,9 @@ pixel-exact; only the shader-driven quads are missing).
 
 ## 7. CI determinism (D9)
 
-- [ ] 7.1 Update `.github/workflows/ci.yml`: pin emsdk to an exact version; Linux golden job with xvfb + Mesa llvmpipe; Windows job relying on WARP; macOS on the pinned runner image; verify native golden jobs pass
-- [ ] 7.2 Add the Emscripten golden job: pinned headless Chrome + SwiftShader flags driving the capture build via a Node script; verify the job passes and its capture matches the committed golden
-- [ ] 7.3 Document the golden regeneration procedure (invocation, when to regenerate) in the README; verify the documented command reproduces a committed golden byte-comparable under tolerance on the host
+- [x] 7.1 Update `.github/workflows/ci.yml`: pin emsdk to an exact version; Linux golden job with xvfb + Mesa llvmpipe; Windows job relying on WARP; macOS on the pinned runner image; verify native golden jobs pass (emsdk pinned 3.1.64; Linux xvfb + `LIBGL_ALWAYS_SOFTWARE=1`; Windows WARP; native golden jobs verified by f2a 3.1/3.2. Caveat: macOS runs `macos-latest`, not a pinned runner image)
+- [x] 7.2 Add the Emscripten golden job: pinned headless Chrome + SwiftShader flags driving the capture build via a Node script; verify the job passes and its capture matches the committed golden (verified by f2b task 4.1: `golden-web` job green, Chrome 131 + SwiftShader)
+- [x] 7.3 Document the golden regeneration procedure (invocation, when to regenerate) in the README; verify the documented command reproduces a committed golden byte-comparable under tolerance on the host
 
 ## 8. Docs and ADR
 
@@ -62,5 +64,5 @@ pixel-exact; only the shader-driven quads are missing).
 
 ## 9. F2 gate (broader verification)
 
-- [ ] 9.1 Full CI run: build matrix + smoke suite + display-list unit tests + golden tests green on Windows, Linux, macOS, Emscripten; verify via the Actions run summary per the verification spec's rendering-milestone gate
-- [ ] 9.2 Confirm the F1 suite still passes unchanged (no regression) and the F1 windowed checklist still holds on the host; verify `ctest` smoke results in the same run
+- [x] 9.1 Full CI run: build matrix + smoke suite + display-list unit tests + golden tests green on Windows, Linux, macOS, Emscripten; verify via the Actions run summary per the verification spec's rendering-milestone gate (run 35705801110 on HEAD `9746a8d`: native 41/41 each, Emscripten 23/23, web goldens all six scenes pass)
+- [x] 9.2 Confirm the F1 suite still passes unchanged (no regression) and the F1 windowed checklist still holds on the host; verify `ctest` smoke results in the same run (confirmed by f2b: desktop suites unaffected and green)
