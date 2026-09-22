@@ -144,3 +144,19 @@ banks) does not apply.
 - **Tag refs change `github.ref`** → the `pages` and `release` gating
   uses explicit `startsWith(github.ref, 'refs/tags/v')` rather than
   assuming a branch ref.
+
+## Apply addendum
+
+Two findings surfaced while proving the tag path against the real
+repository (run `35720979004`):
+
+- **Pages needs a tag policy on the `github-pages` environment.** The
+  environment's deployment branch policy allowed only `main`, so the tag
+  run's `pages` job failed immediately (no steps ran). A `v*` tag policy
+  was added to the environment (a repository setting, not
+  version-controlled) so D3's tag-or-manual Pages behavior works. A repo
+  that skips this setting will see `pages` fail on tag runs.
+- **The release job needs a checkout.** `gh release create
+  --generate-notes` reads git history, which is absent in a job that only
+  downloads artifacts; the job now begins with `actions/checkout@v4` and
+  `fetch-depth: 0`.

@@ -230,6 +230,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download all target archives
         uses: actions/download-artifact@v4
         with:

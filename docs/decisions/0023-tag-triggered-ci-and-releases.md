@@ -49,6 +49,11 @@ when the gate runs and what it leaves behind changed.
   workflow are possible. `gh` needs a token with `actions: write` to
   start a run; release publishing needs `contents: write`, scoped to the
   `release` job only.
+- Pages deployment from a tag requires the `github-pages` environment to
+  allow `v*` tag refs; its deployment branch policy otherwise permits
+  only the default branch, and a tag run's `pages` job fails immediately.
+  That policy is a repository setting (not version-controlled) and must
+  be re-added on a fresh repository for release-triggered Pages deploys.
 
 ## Rejected alternatives
 
