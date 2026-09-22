@@ -238,6 +238,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: player-*
           merge-multiple: true
 
       - name: Create or update release and attach archives

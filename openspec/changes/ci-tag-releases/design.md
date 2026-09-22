@@ -160,3 +160,7 @@ repository (run `35720979004`):
   --generate-notes` reads git history, which is absent in a job that only
   downloads artifacts; the job now begins with `actions/checkout@v4` and
   `fetch-depth: 0`.
+- **The release downloads must be filtered.** `download-artifact` with no
+  filter pulled the auxiliary `github-pages` artifact (`artifact.tar`)
+  into the release upload; the step now uses `pattern: player-*` so only
+  the four target archives are attached.
