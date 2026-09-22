@@ -48,7 +48,7 @@ add_library(efx_platform STATIC
     src/platform/capture.c
 )
 target_include_directories(efx_platform PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/vendor/sokol
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb)
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb ${CMAKE_CURRENT_SOURCE_DIR})
 if(MSVC)
     target_compile_options(efx_platform PRIVATE /W4)
 elseif(NOT EMSCRIPTEN)
