@@ -7,13 +7,13 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
 
 ## Current state
 
-- F1 (player skeleton) is **done**; F2 (2D layer) is **implemented but
-  incomplete/gated** — see `openspec/changes/f2-2d-layer` (verified on
-  GLCORE/GLES3; blocked on D3D11/Metal quads and the web GC crash) and the
-  two stacked follow-ups `openspec/changes/f2a-sokol-shdc` (sokol-shdc
-  generated canned shaders) and `openspec/changes/f2b-web-native-runtime`
-  (no quickjs in the browser; native JS bridge). The normative milestone
-  ladder is `openspec/specs/feature-roadmap`; the table below summarizes it.
+- F1 (player skeleton) is **done**; F2 (2D layer) is **implemented** —
+  GLCORE/GLES3 verified, `f2a-sokol-shdc` archived (D3D11/Metal quads
+  green), and `f2b-web-native-runtime` implemented: the web player runs on
+  the browser's native JS engine through the `src/web/` bridge, with no
+  quickjs in the wasm (ADR 0022). The milestone gate still needs the full
+  four-target CI matrix green. See `openspec/changes/f2-2d-layer` and
+  `openspec/changes/f2b-web-native-runtime`.
 - `src/` is a single core static library (`platform`, `runtime`, `api`,
   `player`, `render`) plus a thin `main.c` (ADR 0003). Sokol and
   quickjs-ng are vendored pinned snapshots under `vendor/`
@@ -28,10 +28,12 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   `setClearColor`, `createImageData`, `createTexture`, `whiteTexture`
   — cataloged in `docs/js-api.md` (F2 entries are current behavior).
 - Verification: ctest runs smoke + headless display-list/JS-API unit tests
-  everywhere; golden-image tests (6 committed scenes under
-  `tests/goldens/`) run where a display exists — Linux CI under
-  `xvfb-run` + llvmpipe, Emscripten in pinned headless Chrome
-  (ADR 0020). Local builds without a display configure with
+  everywhere (on Emscripten the smoke suite runs the same portable scripts
+  through the native bridge with the host JS engine as the runtime, plus
+  `tools/run_web_compare.mjs` diffs desktop vs web output); golden-image
+  tests (6 committed scenes under `tests/goldens/`) run where a display
+  exists — Linux CI under `xvfb-run` + llvmpipe, Emscripten in pinned
+  headless Chrome (ADR 0020). Local builds without a display configure with
   `-DEFX_BUILD_GOLDEN_TESTS=OFF` (the default).
 - **CI verification order (all future changes): run the Linux pipeline
   first and fix anything it finds; only if Linux passes run the Windows
@@ -50,8 +52,9 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
 - C11 core (ADR 0001); rendering via **Sokol** — fixed-function consumer
   API, no script-visible shaders ever (internals use Sokol's programmable
   pipeline with engine-owned canned shaders, ADR 0015);
-  **quickjs-ng** embedded as the ES6
-  runtime (ADR 0002); Emscripten bridge for the browser.
+  **quickjs-ng** embedded as the desktop ES6 runtime (ADR 0002); on
+  Emscripten the page's native JS engine drives the core through the
+  `src/web/` bridge — no quickjs in the wasm (ADR 0022).
 - Build system is CMake; targets: Windows, Linux, macOS, Emscripten;
   output is a single binary "player" for a resource folder/zip with a
   `main.js` entry (godot `res://`-style resource root).
@@ -68,7 +71,7 @@ implements.
 | # | Milestone | Scope (one line) | Verification gate | Status |
 |---|-----------|------------------|-------------------|--------|
 | F1 | Player skeleton | CMake + vendored Sokol/QuickJS, window, resource root, `main.js` hooks, `--script` run mode | Builds on Win/Linux/macOS/Emscripten; script smoke test crosses the JS/C boundary and exits 0 on each | done |
-| F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | incomplete: GLCORE/GLES3 verified; D3D11/Metal quads + web GC blocked (see f2a/f2b) |
+| F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | incomplete: GLCORE/GLES3 + web native-runtime verified; f2a (shdc) archived, f2b (web runtime) implemented (ADR 0022) — full four-target CI matrix pending |
 | F3 | 3D core | Camera, mesh slots, `drawMesh`, matrix math, depth test, vertex colors, procedural primitives | Golden images + math unit tests | planned |
 | F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); F4 lighting shaders reuse the sokol-shdc pipeline (strategy settled in F2, ADR 0021) | Golden images + lighting unit tests against a CPU reference implementation | planned |
 | F5 | Render targets + post FX | RTT, fullscreen-quad passes, color filter, blur | Golden images | planned |

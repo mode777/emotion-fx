@@ -101,6 +101,49 @@ Land the bridge behind the existing Emscripten targets; the web golden
 job flips green or the change is not merged. Desktop behavior is
 untouched (same binaries, same tests). Rollback = revert.
 
+## Addendum (apply)
+
+Decisions settled while implementing, recorded for the archived record:
+
+- **Golden capture mode is a runtime flag, not a compile-time define.**
+  `EFX_WEB_GOLDEN` is defined on the `player_web_golden` target, but the
+  root/capture selection lives in `src/web/bridge.c`, which compiles once
+  into `efx_core`. `src/web/web_main.c` (per-target) calls
+  `efx_web_set_golden_mode()` before `efx_web_main`, so the shared core
+  carries the mode at runtime.
+- **The sokol loop starts after `main.js` evaluates** (desktop ordering:
+  script before window/GL). `entry.js` boots from `postRun`, and only a
+  successful boot calls `efx_web_start_loop()`; an eval-time `quit()` or
+  a missing entry script therefore never opens a frame loop. On web the
+  full render-stack teardown moved into the sokol cleanup callback
+  (`src/platform/platform.c`), since no C caller resumes after
+  `sapp_run` returns.
+- **Game scripts get a portable environment.** The entry script is
+  evaluated through a wrapper whose parameters shadow `window`,
+  `document`, `require`, `process`, `fetch`, `XMLHttpRequest`, `module`,
+  `exports`, `Buffer`, `global`, plus a `globalThis` Proxy that denies
+  those names — so `s_portable.js` and the js-api "no host
+  dependencies" rule hold identically on desktop and web. `efx` is
+  passed in as a parameter and also published on the real global.
+- **`_malloc`/`_free` are exported** on web targets: Emscripten's
+  `emscripten_run_script_string` helper (used for query parsing) needs
+  `_free`, and the bridge's ImageData scratch buffer needs `_malloc`.
+- **`efx_api_tests` is desktop-only.** "No quickjs in any Emscripten
+  target" is enforced for the shipped web player artifacts
+  (`player`/`player_web`/`player_web_golden`, verified by an nm check
+  with zero quickjs symbols). The quickjs-binding unit test binary stays
+  a desktop test; web API parity is covered by the host-engine ctest
+  suite, the browser harness and `tools/run_web_compare.mjs`.
+- **Explicit hook registration (ADR 0016) is not delivered here.** The
+  bridge wires the global `update`/`render` hooks exactly like the
+  desktop runtime; `registerUpdateHook`/`registerRenderHook` do not
+  exist on either binding yet (docs/js-api.md still marks them as the
+  target contract), and the task's parenthetical ("plus registration
+  hooks") stays future runtime work so both runtimes remain identical.
+- **`--script` mode stays desktop-only** (per non-goals); the web player
+  runs resource-root mode only, and the Node-hosted smoke suite stages
+  each script as a root's `main.js`.
+
 ## Open Questions
 
 None.

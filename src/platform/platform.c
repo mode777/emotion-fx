@@ -185,8 +185,17 @@ static void efx_cleanup_cb(void) {
         g_cap_mtl = NULL;
     }
 #endif
+#if defined(__EMSCRIPTEN__)
+    /* the web loop has no C caller after sapp_run returns (ADR 0022): the
+       full render-stack teardown happens here, when the sokol loop ends */
+    efx_render_end_frame();
+    efx_render_shutdown();
+    efx_pipeline_shutdown();
+    sg_shutdown();
+#else
     /* sg_shutdown is deferred to efx_platform_shutdown() so callers can
        release their GPU resources first */
+#endif
 }
 
 int efx_platform_run(const efx_platform_desc *desc, efx_frame_hooks hooks) {

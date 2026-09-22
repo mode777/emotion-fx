@@ -18,18 +18,31 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-set(QJS_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
-set(QJS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(QJS_BUILD_LIBC OFF CACHE BOOL "" FORCE)
-add_subdirectory(vendor/quickjs-ng EXCLUDE_FROM_ALL)
+if(NOT EMSCRIPTEN)
+    # ADR 0022: quickjs never ships to the browser — the web player is the
+    # C core + the page's native JS engine through the src/web/ bridge.
+    set(QJS_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+    set(QJS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(QJS_BUILD_LIBC OFF CACHE BOOL "" FORCE)
+    add_subdirectory(vendor/quickjs-ng EXCLUDE_FROM_ALL)
+endif()
 
-add_library(efx_core STATIC
-    src/api/api.c
-    src/runtime/runtime.c
-    src/render/render.c
-)
+if(EMSCRIPTEN)
+    add_library(efx_core STATIC
+        src/render/render.c
+        src/web/bridge.c
+    )
+else()
+    add_library(efx_core STATIC
+        src/api/api.c
+        src/runtime/runtime.c
+        src/render/render.c
+    )
+endif()
 target_include_directories(efx_core PUBLIC src)
-target_link_libraries(efx_core PUBLIC qjs)
+if(NOT EMSCRIPTEN)
+    target_link_libraries(efx_core PUBLIC qjs)
+endif()
 if(UNIX)
     target_link_libraries(efx_core PUBLIC m)
 endif()
@@ -58,37 +71,60 @@ if(UNIX AND NOT APPLE)
     target_compile_definitions(efx_platform PRIVATE _POSIX_C_SOURCE=200809L)
 endif()
 
-add_executable(player
-    src/main.c
-    src/player/player.c
-)
+if(EMSCRIPTEN)
+    add_executable(player src/web/web_main.c)
+else()
+    add_executable(player
+        src/main.c
+        src/player/player.c
+    )
+endif()
 target_link_libraries(player PRIVATE efx_core efx_platform)
 
 if(EMSCRIPTEN)
-    set_target_properties(player PROPERTIES SUFFIX ".js")
-    target_link_options(player PRIVATE -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2 -sNODERAWFS=1 -sSTACK_SIZE=2MB)
+    set(EFX_WEB_COMMON
+        -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2MB
+        -sEXPORTED_FUNCTIONS=_main,_malloc,_free
+        "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/web/boot_pre.js"
+        "--post-js=${CMAKE_CURRENT_SOURCE_DIR}/src/web/entry.js")
 
-    add_executable(player_web src/main.c src/player/player.c)
+    # Node-runnable web player (host-engine smoke/comparison harness; the
+    # desktop-style --script mode is a desktop-only run mode)
+    set_target_properties(player PROPERTIES
+        SUFFIX ".js"
+        LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/web/entry.js;${CMAKE_CURRENT_SOURCE_DIR}/src/web/boot_pre.js")
+    target_link_options(player PRIVATE
+        ${EFX_WEB_COMMON}
+        -sMAX_WEBGL_VERSION=2
+        -sNODERAWFS=1 -sENVIRONMENT=node)
+
+    add_executable(player_web src/web/web_main.c)
     target_link_libraries(player_web PRIVATE efx_core efx_platform)
-    set_target_properties(player_web PROPERTIES SUFFIX ".html")
+    set_target_properties(player_web PROPERTIES
+        SUFFIX ".html"
+        LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/web/entry.js;${CMAKE_CURRENT_SOURCE_DIR}/src/web/boot_pre.js;${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web_pre.js;${CMAKE_CURRENT_SOURCE_DIR}/examples/browser/main.js")
     target_link_options(player_web PRIVATE
-        -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2
-        -sENVIRONMENT=web
+        ${EFX_WEB_COMMON}
+        -sMAX_WEBGL_VERSION=2 -sENVIRONMENT=web
         "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/examples/browser@/examples/browser"
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/platform/web_pre.js")
 
     # browser capture build for the Emscripten golden-image job (ADR 0020):
-    # goldens scenes are preloaded to /goldens/<scene>, captures are written
-    # to MEMFS /captures/<scene>.png and read back by tools/run_web_goldens.mjs
+    # goldens scenes are preloaded to /goldens/<scene>, harness fixture roots
+    # to /fixtures/<name>; captures are exported via canvas.toDataURL and
+    # read back by tools/run_web_goldens.mjs / tools/run_web_harness.mjs
     if(EFX_BUILD_GOLDEN_TESTS)
-        add_executable(player_web_golden src/main.c src/player/player.c)
+        add_executable(player_web_golden src/web/web_main.c)
         target_link_libraries(player_web_golden PRIVATE efx_core efx_platform)
         target_compile_definitions(player_web_golden PRIVATE EFX_WEB_GOLDEN=1)
-        set_target_properties(player_web_golden PROPERTIES SUFFIX ".js")
+        set_target_properties(player_web_golden PROPERTIES
+            SUFFIX ".js"
+            LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/web/entry.js;${CMAKE_CURRENT_SOURCE_DIR}/src/web/boot_pre.js")
         target_link_options(player_web_golden PRIVATE
-            -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sMAX_WEBGL_VERSION=2 -sSTACK_SIZE=4MB
-            -sENVIRONMENT=web
-            "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens@/goldens")
+            ${EFX_WEB_COMMON}
+            -sMAX_WEBGL_VERSION=2 -sENVIRONMENT=web -sSTACK_SIZE=4MB
+            "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/tests/goldens@/goldens"
+            "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures@/fixtures")
     endif()
 elseif(APPLE)
     enable_language(OBJC)
@@ -149,7 +185,9 @@ else()
     target_compile_options(efx_render_tests PRIVATE -Wall -Wextra -Werror)
 endif()
 
-# headless JS-API tests (mock GPU sink + real quickjs runtime + bindings)
+# headless JS-API tests (mock GPU sink + real quickjs runtime + bindings);
+# desktop-only: ADR 0022 keeps quickjs out of every Emscripten target
+if(NOT EMSCRIPTEN)
 add_executable(efx_api_tests
     src/api/api.c
     src/runtime/runtime.c
@@ -160,9 +198,6 @@ target_include_directories(efx_api_tests PRIVATE src)
 if(UNIX)
     target_link_libraries(efx_api_tests PRIVATE m)
 endif()
-if(EMSCRIPTEN)
-    target_link_options(efx_api_tests PRIVATE -sALLOW_MEMORY_GROWTH=1)
-endif()
 target_link_libraries(efx_api_tests PRIVATE qjs)
 if(MSVC)
     target_compile_options(efx_api_tests PRIVATE /W4 /WX)
@@ -172,6 +207,7 @@ else()
 endif()
 if(NOT MSVC)
     target_compile_definitions(efx_api_tests PRIVATE _POSIX_C_SOURCE=200809L)
+endif()
 endif()
 
 if(EFX_BUILD_DEV_HARNESS AND NOT EMSCRIPTEN)

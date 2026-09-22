@@ -15,6 +15,14 @@ change). See `vision.md` for product goals and
 - **Two layers.** `[C]` entries are implemented in C and registered through
   the engine binding. `[JS]` entries are engine-provided, bundled pure ES6
   built on top of the public `[C]` API — nothing else.
+- **Runtime binding per platform.** Every `[C]` entry is implemented once
+  in C and exposed to scripts through the platform's binding — on desktop
+  the embedded quickjs binding (`C · quickjs`, `src/api/` + `src/runtime/`),
+  on Emscripten the native bridge to the page's own JS engine
+  (`C · bridge`, `src/web/`; ADR 0022). Names, signatures, semantics,
+  errors, and resource lifecycle are identical across both bindings — the
+  same script text runs on every target, and game scripts never see host
+  globals (`window`, `document`, `process`, …).
 - **Entry tags.** Each catalog entry carries its delivering milestone and
   layer:
 
@@ -149,7 +157,10 @@ payload + `skinned` flag: ADR 0017, all under `docs/decisions/`).
 ### F1 — Environment & utilities (current)
 
 Implemented in `src/api/api.c` and registered on the `efx` object by
-`src/runtime/runtime.c`. These are current behavior, not provisional.
+`src/runtime/runtime.c` (desktop, `C · quickjs`); on Emscripten the same
+functions come from `src/web/bridge.c` through the native bridge
+(`C · bridge`) with identical semantics. These are current behavior, not
+provisional.
 
 ```js
 // F1 · C
@@ -212,7 +223,7 @@ one camera. Coordinates are frame pixels, origin at the **top-left**,
 y pointing **down**, angles in degrees measured clockwise.
 
 ```js
-// F2 · C · current
+// F2 · C · current — desktop binding `C · quickjs`, web binding `C · bridge`; identical semantics
 efx.setClearColor(color)          // [r,g,b,a]; frame clear color (default black)
 efx.setCamera2D(opts)             // { frame?, x?, y?, zoom?, rotation? }
 efx.createImageData(opts)         // → ImageData; { width, height, pixels, format? = 'rgba8' }

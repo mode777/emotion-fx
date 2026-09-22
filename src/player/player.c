@@ -8,10 +8,6 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#if defined(__EMSCRIPTEN__) && defined(EFX_WEB_GOLDEN)
-#include <emscripten.h>
-#endif
-
 #ifdef _WIN32
 #define EFX_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
 #define EFX_ISREG(m) (((m) & S_IFMT) == S_IFREG)
@@ -80,9 +76,7 @@ int efx_player_frame(void *ud) {
 
     /* frame-end collection: unreferenced native resources are finalized
        within roughly a frame (js-api resource lifecycle rules) */
-#ifndef EFX_WEB_GOLDEN
     efx_runtime_collect(rt); /* frame-end GC (js-api lifecycle rules) */
-#endif
     return efx_runtime_quit_requested(rt) || efx_runtime_in_error(rt);
 }
 
@@ -154,25 +148,6 @@ static int run_root_mode(const char *root, const efx_platform_capture *capture) 
 }
 
 int efx_player_main(int argc, char **argv) {
-#if defined(__EMSCRIPTEN__) && defined(EFX_WEB_GOLDEN)
-    {
-        static char rootbuf[160];
-        static char outbuf[160];
-        char scene[64] = "clear";
-        {
-            const char *s = emscripten_run_script_string(
-                "(function(){ try { return new URLSearchParams(location.search).get('scene') || 'clear'; } catch (e) { return 'clear'; } })()");
-            snprintf(scene, sizeof(scene), "%s", s ? s : "clear");
-        }
-        snprintf(outbuf, sizeof(outbuf), "/captures/%s.png", scene);
-        snprintf(rootbuf, sizeof(rootbuf), "/goldens/%s", scene);
-        efx_platform_capture capture;
-        memset(&capture, 0, sizeof(capture));
-        capture.frame = 2;
-        capture.output = outbuf;
-        return run_root_mode(rootbuf, &capture);
-    }
-#endif
     if (argc < 2) {
         return usage();
     }

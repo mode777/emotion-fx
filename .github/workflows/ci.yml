@@ -65,8 +65,24 @@ jobs:
       - name: Build
         run: cmake --build build-em
 
-      - name: Smoke tests (headless under Node)
+      - name: Smoke tests (headless under Node, native bridge)
         run: ctest --test-dir build-em --output-on-failure
+
+      - name: Install Linux window dependencies (native comparison baseline)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxi-dev libxcursor-dev libgl1-mesa-dev
+
+      - name: Build native player (desktop quickjs baseline)
+        run: |
+          cmake -B build-native -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-native --target player
+
+      - name: Cross-runtime comparison smoke test
+        run: node tools/run_web_compare.mjs
+        env:
+          NATIVE_PLAYER: build-native/player
+          WEB_PLAYER_BUILD: build-em
 
   golden-web:
     name: golden tests (emscripten / headless chrome)
@@ -109,6 +125,11 @@ jobs:
 
       - name: Golden tests via headless Chrome (SwiftShader WebGL)
         run: node tools/run_web_goldens.mjs
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+
+      - name: Browser runtime harness (boot, hooks, errors, exit codes)
+        run: node tools/run_web_harness.mjs
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
 

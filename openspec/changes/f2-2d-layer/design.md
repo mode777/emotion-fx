@@ -221,6 +221,18 @@ wiring described implicitly by D2/D10 were **superseded by
 backends. The blend-equation pipelines (three variants) and all D2
 semantics are unchanged.
 
+## Addendum (f2b-web-native-runtime)
+
+The frame-end `JS_RunGC` segfault in the browser frame callback (task
+notes above) is **resolved by `f2b-web-native-runtime`** (ADR 0022):
+quickjs is removed from every Emscripten build, so no embedded-GC
+machinery exists on web and there is nothing to collect — the
+`EFX_WEB_GOLDEN` collect-skip workaround and its investigation are
+obsolete (the skip is deleted; `efx_player_frame` is desktop-only). The
+web player runs `main.js` on the browser's native engine through the
+`src/web/` bridge with the same `efx` contract, error/exit semantics and
+golden-image gate; the crash class is structurally absent.
+
 ## Open Questions
 
 None — the deferred items assigned to F2 (tolerance, CI determinism, emsdk

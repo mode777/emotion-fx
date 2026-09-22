@@ -31,6 +31,7 @@ directory holds only what stays true after a change is archived.
 | [0019](0019-display-list-recording-semantics.md) | Accepted | Display list records are frame-transient; value-snapshot small state, handle-reference resources |
 | [0020](0020-golden-image-verification.md) | Accepted | Golden images: PNG via vendored stb, ±2/255 tolerance with a 0.5% pixel exemption, software rasterizers and pinned toolchains in CI |
 | [0021](0021-sokol-shdc-canned-shaders.md) | Accepted | Canned shaders come from sokol-shdc; one GLSL source, no hand-written per-backend flavors |
+| [0022](0022-quickjs-desktop-only.md) | Accepted | quickjs never ships to the browser; the browser's native JS engine is the web runtime behind the `src/web/` bridge |
 
 ## Adding a decision
 
