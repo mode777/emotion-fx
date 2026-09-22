@@ -1,0 +1,51 @@
+name: pages
+
+# Public web player deployment (ADR 0023, amended by
+# separate-pages-deploy). Pages is deliberately NOT a job in the ci gate
+# workflow: the github-pages environment only permits the default branch,
+# so a gate run on a feature branch would fail on deploy and mask the
+# verification result. This workflow owns build + deploy instead.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: deploy web player (github pages)
+    # manual dispatch from any other ref is a no-op (protected environment)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.64' # pinned consistently with the rest of CI
+
+      - name: Build web player
+        run: |
+          emcmake cmake -B build-web -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-web --target player_web
+
+      - name: Collect pages content
+        run: |
+          mkdir pages
+          cp build-web/player_web.html pages/index.html
+          cp build-web/player_web.js build-web/player_web.wasm pages/
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

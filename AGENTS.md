@@ -44,6 +44,10 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   archives (native player for Linux/Windows/macOS, Emscripten web bundle)
   as workflow artifacts, and a tag run attaches the same archives to that
   tag's GitHub Release. Use a manual run to prove the gate.
+- **Pages deploys separately.** The public web player is built and
+  deployed by `.github/workflows/pages.yml` on pushes to `main` and on
+  manual dispatch — not by the gate workflow. A manual gate run on any
+  ref therefore contains no deployment job and can be green.
 - **CI verification order (all future changes): run the Linux pipeline
   first and fix anything it finds; only if Linux passes run the Windows
   pipeline; only if Windows passes run the macOS pipeline.** Linux is the
