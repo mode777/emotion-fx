@@ -31,7 +31,7 @@ static int run_frames(int argc, char **argv) {
         efx_runtime_pick_hooks(rt, &has_update, &has_render);
         fprintf(stderr, "harness: hooks update=%d render=%d\n", has_update, has_render);
         for (int i = 0; i < frames; i++) {
-            if (efx_player_frame(rt)) {
+            if (efx_player_frame(rt, 1.0 / 60.0)) {
                 break;
             }
         }

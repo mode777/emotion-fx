@@ -21,14 +21,16 @@ static struct {
     int dom;
     int golden_mode;
     efx_platform_capture capture;
+    double frame_last_now;
+    int frame_have_now;
 } W;
 
 EM_JS(int, efx_web_has_dom_js, (void), {
     return (typeof document !== 'undefined') ? 1 : 0;
 });
 
-EM_JS(int, efx_web_call_hook_js, (int which), {
-    return globalThis.__efxDispatchHook(which);
+EM_JS(int, efx_web_call_hook_js, (int which, double dt), {
+    return globalThis.__efxDispatchHook(which, dt);
 });
 
 EM_JS(void, efx_web_publish_exit, (int code), {
@@ -215,16 +217,16 @@ EMSCRIPTEN_KEEPALIVE int efx_bridge_draw_quad(double handle, float x, float y, f
     return efx_render_quad(x, y, w, h, (uint64_t)handle, color, rotation, scale, src, has_src);
 }
 
-static int web_frame(void *ud) {
+static int web_frame(void *ud, double dt) {
     (void)ud;
     int stop = 0;
     if (W.quit_requested || W.in_error) {
         stop = 1;
-    } else if (efx_web_call_hook_js(1) != 0) {
+    } else if (efx_web_call_hook_js(1, dt) != 0) {
         stop = 1;
     } else if (W.quit_requested || W.in_error) {
         stop = 1;
-    } else if (efx_web_call_hook_js(0) != 0) {
+    } else if (efx_web_call_hook_js(0, dt) != 0) {
         stop = 1;
     } else if (W.quit_requested || W.in_error) {
         stop = 1;
@@ -236,7 +238,13 @@ static int web_frame(void *ud) {
 }
 
 EMSCRIPTEN_KEEPALIVE int efx_bridge_frame(void) {
-    return web_frame(NULL);
+    /* direct (Node harness) path bypasses the sokol frame loop, so derive dt
+       here; the first frame reports 0 (desktop parity, design D3) */
+    double now = emscripten_get_now();
+    double dt = W.frame_have_now ? (now - W.frame_last_now) / 1000.0 : 0.0;
+    W.frame_have_now = 1;
+    W.frame_last_now = now;
+    return web_frame(NULL, dt);
 }
 
 EMSCRIPTEN_KEEPALIVE const char *efx_web_root(void) {

@@ -25,10 +25,12 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   and headless (`player --script <file> [args…]`, exit-code contract),
   plus a capture mode for golden images (`--capture-frame N
   --capture-output file`, ADR 0020).
-- The script-facing API: F1's `efx.log`, `efx.quit`, `efx.args`, plus F2's
-  2D layer — `setCamera2D` (virtual frame), `drawQuad`, `setBlendMode`,
+- The script-facing API: F1's `efx.log`, `efx.quit`, `efx.args`, and
+  lifecycle `efx.registerUpdateHook` / `efx.registerRenderHook` (stacking,
+  `dt`, unsubscribe; global `update`/`render` remain load-time sugar), plus
+  F2's 2D layer — `setCamera2D` (virtual frame), `drawQuad`, `setBlendMode`,
   `setClearColor`, `createImageData`, `createTexture`, `whiteTexture`
-  — cataloged in `docs/js-api.md` (F2 entries are current behavior).
+  — cataloged in `docs/js-api.md` (F1/F2 entries are current behavior).
 - Verification: ctest runs smoke + headless display-list/JS-API unit tests
   everywhere (on Emscripten the smoke suite runs the same portable scripts
   through the native bridge with the host JS engine as the runtime, plus
@@ -55,6 +57,12 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   Windows and macOS are slower per-roundtrip and verified in that order.
   The full matrix still gates every milestone (ADR 0020) — the order is
   about how changes are iterated, not about which targets count.
+- **Agents may commit and push to run the gate.** Because CI never fires on
+  an ordinary push (ADR 0023), an agent verifying a change MAY create a
+  branch, commit, and push for the sole purpose of dispatching
+  `gh workflow run ci.yml --ref <branch>` — no separate commit/push request
+  is needed for feature verification. Keep commits scoped to the change under
+  verification and never sweep in unrelated working-tree changes.
 - `package.json` exists only to install the OpenSpec CLI. The
   `openspec` binary is not on PATH: run `npm install` once, then invoke
   commands as `npx openspec <command>` from the repo root (e.g.

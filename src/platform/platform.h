@@ -3,7 +3,7 @@
 
 typedef struct efx_frame_hooks {
     void *ud;
-    int (*on_frame)(void *ud);
+    int (*on_frame)(void *ud, double dt); /* dt: seconds since previous frame */
 } efx_frame_hooks;
 
 typedef struct efx_platform_capture {

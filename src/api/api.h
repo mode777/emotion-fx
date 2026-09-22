@@ -7,6 +7,10 @@ JSValue efx_js_log(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst
 JSValue efx_js_quit(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
 JSValue efx_js_args(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
 
+/* F1 — lifecycle hooks (ADR 0016) */
+JSValue efx_js_registerUpdateHook(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+JSValue efx_js_registerRenderHook(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+
 /* F2 — 2D drawing */
 JSValue efx_js_setClearColor(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
 JSValue efx_js_setCamera2D(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
