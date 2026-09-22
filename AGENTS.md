@@ -33,6 +33,13 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   `xvfb-run` + llvmpipe, Emscripten in pinned headless Chrome
   (ADR 0020). Local builds without a display configure with
   `-DEFX_BUILD_GOLDEN_TESTS=OFF` (the default).
+- **CI verification order (all future changes): run the Linux pipeline
+  first and fix anything it finds; only if Linux passes run the Windows
+  pipeline; only if Windows passes run the macOS pipeline.** Linux is the
+  fastest, cheapest signal (llvmpipe, matches the canonical goldens);
+  Windows and macOS are slower per-roundtrip and verified in that order.
+  The full matrix still gates every milestone (ADR 0020) — the order is
+  about how changes are iterated, not about which targets count.
 - `package.json` exists only to install the OpenSpec CLI. The
   `openspec` binary is not on PATH: run `npm install` once, then invoke
   commands as `npx openspec <command>` from the repo root (e.g.
