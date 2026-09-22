@@ -1,6 +1,7 @@
 # 0023 — CI runs on version tags and manual dispatch, and every run publishes binaries
 
-Status: Accepted (cross-cutting; change `ci-tag-releases`)
+Status: Accepted (cross-cutting; change `ci-tag-releases`; amended 2026-09,
+change `separate-pages-deploy`: Pages deployment moved to its own workflow)
 
 ## Context
 
@@ -32,10 +33,12 @@ runs. On tag runs a single `release` job (`needs: [native, emscripten]`,
 as assets of the GitHub Release for that tag using the preinstalled `gh`
 CLI.
 
-`generate-goldens` remains manual-only; `pages` deploys on tag or manual
-dispatch so removing the branch-push trigger does not strand it. The
-golden jobs and their pinned conditions (ADR 0020) are unchanged — only
-when the gate runs and what it leaves behind changed.
+`generate-goldens` remains manual-only. Pages deployment lives in a
+separate workflow (`.github/workflows/pages.yml`) that runs on pushes to
+the default branch and on manual dispatch; the gate workflow contains no
+deployment job, so a manual gate run on any ref reflects verification
+only. The golden jobs and their pinned conditions (ADR 0020) are
+unchanged — only when the gate runs and what it leaves behind changed.
 
 ## Consequences
 
@@ -49,11 +52,15 @@ when the gate runs and what it leaves behind changed.
   workflow are possible. `gh` needs a token with `actions: write` to
   start a run; release publishing needs `contents: write`, scoped to the
   `release` job only.
-- Pages deployment from a tag requires the `github-pages` environment to
-  allow `v*` tag refs; its deployment branch policy otherwise permits
-  only the default branch, and a tag run's `pages` job fails immediately.
-  That policy is a repository setting (not version-controlled) and must
-  be re-added on a fresh repository for release-triggered Pages deploys.
+- Pages deploys from the default branch, which the `github-pages`
+  environment permits by default, so no tag policy is required. A manual
+  dispatch of the Pages workflow from any other ref skips its deploy job
+  (the protected environment would otherwise fail it). The `v*` tag
+  policy added for the earlier tag-triggered deploy is now unused and can
+  be left in place. This reverses the original choice to keep `pages`
+  inside the gate: `workflow_dispatch` is the agent verification entry
+  point, and a deploy job that cannot succeed on a feature branch made
+  successful verification runs report as failures.
 
 ## Rejected alternatives
 
@@ -67,3 +74,8 @@ when the gate runs and what it leaves behind changed.
   already used by the project's tooling; no new dependency.
 - **Each matrix job uploading to the release directly.** Concurrent
   release creation races, and it duplicates the write token across jobs.
+- **Keeping Pages inside the gate with a default-branch-only guard.**
+  Considered when separating it (change `separate-pages-deploy`); it
+  stops the false failure but leaves a deploy job in the gate, so a Pages
+  outage or policy change would still redden a default-branch/tag gate
+  run. A separate workflow keeps the gate's status unambiguous.
