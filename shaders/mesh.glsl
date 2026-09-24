@@ -12,6 +12,7 @@
 @vs mesh_vs
 layout(binding=0) uniform vs_params {
     mat4 mvp;
+    vec4 tint;
 };
 
 /* Attribute slots must be declared consumed-first: the canned F3 shader
@@ -26,21 +27,17 @@ out vec4 efx_color;
 
 void main() {
     gl_Position = mvp * vec4(a_pos, 1.0);
-    efx_color = a_color;
+    efx_color = a_color * tint;
 }
 @end
 
 @fs mesh_fs
-layout(binding=1) uniform fs_params {
-    vec4 tint;
-};
-
 in vec4 efx_color;
 
 out vec4 frag_color;
 
 void main() {
-    frag_color = efx_color * tint;
+    frag_color = efx_color;
 }
 @end
 

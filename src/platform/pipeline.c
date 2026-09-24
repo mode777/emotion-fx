@@ -389,11 +389,10 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
 
     vs_params_t vs;
     memcpy(vs.mvp, mvp, sizeof(mvp));
-    fs_params_t fs;
-    fs.tint[0] = mr->color[0];
-    fs.tint[1] = mr->color[1];
-    fs.tint[2] = mr->color[2];
-    fs.tint[3] = mr->color[3];
+    vs.tint[0] = mr->color[0];
+    vs.tint[1] = mr->color[1];
+    vs.tint[2] = mr->color[2];
+    vs.tint[3] = mr->color[3];
 
     sg_apply_pipeline(P.mesh_pip[mr->blend]);
     for (int i = 0; i < m->surface_count; i++) {
@@ -408,19 +407,15 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
             sg_apply_bindings(&bnd);
             sg_apply_uniforms(UB_vs_params,
                               &(sg_range){.ptr = &vs, .size = sizeof(vs)});
-            sg_apply_uniforms(UB_fs_params,
-                              &(sg_range){.ptr = &fs, .size = sizeof(fs)});
             sg_draw(0, s->vertex_count, 1);
             continue;
         }
         bnd.index_buffer = s->ibuf;
         sg_apply_bindings(&bnd);
         /* documented order: pipeline -> bindings -> uniforms -> draw; the
-           uniforms are per record, applied for every surface draw */
+           single uniform block is per record, applied per surface draw */
         sg_apply_uniforms(UB_vs_params,
                           &(sg_range){.ptr = &vs, .size = sizeof(vs)});
-        sg_apply_uniforms(UB_fs_params,
-                          &(sg_range){.ptr = &fs, .size = sizeof(fs)});
         sg_draw(0, s->index_count, 1);
     }
 }
@@ -463,25 +458,39 @@ void efx_pipeline_play(void) {
         }
     }
 
-    /* interleave quad runs and mesh records in record order */
+    /* F2 playback: emit ALL quad runs into one dynamic-buffer update
+       (multiple updates per frame are unreliable on Metal/D3D11), then
+       interleave run draws and mesh records in record order */
+    pipe_vertex *v = P.scratch;
+    int *run_first = malloc((size_t)(run_count > 0 ? run_count : 1) * sizeof(int));
+    int *run_verts = malloc((size_t)(run_count > 0 ? run_count : 1) * sizeof(int));
+    if (!run_first || !run_verts) {
+        free(run_first);
+        free(run_verts);
+        return;
+    }
+    for (int ri = 0; ri < run_count; ri++) {
+        run_first[ri] = (int)(v - P.scratch);
+        int start = (int)(v - P.scratch);
+        for (int q = 0; q < runs[ri].count; q++) {
+            if (q > 0) {
+                v = emit_quad_bridged(v, &records[runs[ri].start + q].u.quad);
+            } else {
+                v = emit_quad(v, &records[runs[ri].start + q].u.quad);
+            }
+        }
+        run_verts[ri] = (int)(v - P.scratch) - start;
+    }
+    int vcount = (int)(v - P.scratch);
+    if (vcount > 0) {
+        sg_update_buffer(P.vbuf, &(sg_range){.ptr = P.scratch,
+                                             .size = (size_t)vcount * sizeof(pipe_vertex)});
+    }
+
     int run_i = 0;
     for (int i = 0; i < count; i++) {
         if (records[i].type == EFX_RECORD_QUAD) {
             if (run_i < run_count && runs[run_i].start == i) {
-                /* emit this run's quads into scratch, draw, then continue
-                   after the run */
-                int rcount = runs[run_i].count;
-                pipe_vertex *v = P.scratch;
-                for (int q = 0; q < rcount; q++) {
-                    if (q > 0) {
-                        v = emit_quad_bridged(v, &records[i + q].u.quad);
-                    } else {
-                        v = emit_quad(v, &records[i + q].u.quad);
-                    }
-                }
-                int vcount = (int)(v - P.scratch);
-                sg_update_buffer(P.vbuf, &(sg_range){.ptr = P.scratch,
-                                                     .size = (size_t)vcount * sizeof(pipe_vertex)});
                 sg_apply_pipeline(P.quad_pip[runs[run_i].blend]);
                 sg_bindings bnd = {0};
                 bnd.vertex_buffers[0] = P.vbuf;
@@ -490,15 +499,17 @@ void efx_pipeline_play(void) {
                     bnd.views[0] = t->view;
                     bnd.samplers[0] = P.smp;
                     sg_apply_bindings(&bnd);
-                    sg_draw(0, vcount, 1);
+                    sg_draw(run_first[run_i], run_verts[run_i], 1);
                 }
                 run_i++;
-                i += rcount - 1;
+                i += runs[run_i - 1].count - 1;
             }
         } else {
             play_mesh_record(&records[i].u.mesh, aspect);
         }
     }
+    free(run_first);
+    free(run_verts);
 }
 
 void efx_pipeline_shutdown(void) {
