@@ -95,6 +95,6 @@
   `python3 tools/verify_remote.py all <branch>` (credentials from
   `SSH_HOST`/`SSH_USER`/`SSH_PASSWORD` env only). Fix and re-verify until
   green; do not dispatch GitHub Actions before this passes.
-- [ ] 6.3 Dispatch the gate: `gh workflow run ci.yml --ref <branch>`, then
+- [x] 6.3 Dispatch the gate: `gh workflow run ci.yml --ref <branch>`, then
   triage failures strictly Linux → Windows → macOS until the four-target
   matrix is green (manual-dispatch run, no Pages deployment involved).
