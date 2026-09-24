@@ -298,6 +298,12 @@ void efx_pipeline_install(void) {
                a synthesized identity index buffer at upload (render.c) */
             .index_type = DIAG_U16 ? SG_INDEXTYPE_UINT16
                                    : SG_INDEXTYPE_UINT32,
+            /* Only the attributes the canned F3 shader consumes are
+               declared: the HLSL/Metal compilers strip unused inputs from
+               the shader signature, and a pipeline declaring them fails
+               InputLayout/RPS creation on D3D11/Metal (GL is lenient).
+               The 48-byte interleaved layout is unchanged; F4 re-adds
+               attrs 1/2 when its shaders start reading normals/uvs. */
             .layout = DIAG_POSONLY
                 ? (sg_vertex_layout_state){
                       .buffers[0].stride = 12,
@@ -305,9 +311,7 @@ void efx_pipeline_install(void) {
                                                      SG_VERTEXFORMAT_FLOAT3}}}
                 : (sg_vertex_layout_state){
                       .buffers[0].stride = (int)sizeof(pipe_mesh_vertex),
-                      .attrs = {[ATTR_mesh_a_pos] = {.format = SG_VERTEXFORMAT_FLOAT3},
-                                [ATTR_mesh_a_normal] = {.format = SG_VERTEXFORMAT_FLOAT3, .offset = 12},
-                                [ATTR_mesh_a_uv] = {.format = SG_VERTEXFORMAT_FLOAT2, .offset = 24},
+                      .attrs = {[ATTR_mesh_a_pos] = {.format = SG_VERTEXFORMAT_FLOAT3, .offset = 0},
                                 [ATTR_mesh_a_color] = {.format = SG_VERTEXFORMAT_FLOAT4, .offset = 32}}},
             .colors[0] = {.pixel_format = SG_PIXELFORMAT_RGBA8,
                           .blend = blends[i]},
