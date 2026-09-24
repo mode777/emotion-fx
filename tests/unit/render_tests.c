@@ -425,7 +425,8 @@ static int mesh_lifecycle(void) {
     if (g_mesh_created != 1) return fail("sink create_mesh not called");
     if (g_last_mesh_surf_count != 2) return fail("gpu surface count");
     if (g_last_mesh_vert_total != 6) return fail("gpu vertex total");
-    if (g_last_mesh_index_total != 3) return fail("gpu index total");
+    /* surface 0: 3 real indices; surface 1: 3 synthesized identity ones */
+    if (g_last_mesh_index_total != 6) return fail("gpu index total");
 
     /* Mesh is a copy: destroying the MeshData keeps the Mesh alive */
     efx_meshdata_destroy(md);

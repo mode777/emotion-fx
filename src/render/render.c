@@ -518,8 +518,16 @@ static int pending_build(mesh_pending *p, const efx_meshdata *md) {
         floats += (size_t)s->vertex_count * 12;
         indices += (size_t)s->index_count;
     }
+    /* non-indexed surfaces draw through a synthesized identity index
+       buffer (the pipeline is always-indexed; see pipeline.c) */
+    size_t index_words = 0;
+    for (int i = 0; i < md->surface_count; i++) {
+        const efx_surface *s = &md->surfaces[i];
+        index_words += s->index_count ? (size_t)s->index_count
+                                      : (size_t)s->vertex_count;
+    }
     size_t header = (size_t)md->surface_count * 2;
-    size_t total_words = header + floats + indices;
+    size_t total_words = header + floats + index_words;
     p->data = malloc(total_words * sizeof(uint32_t));
     p->surfs = calloc((size_t)md->surface_count, sizeof(efx_mesh_gpu_surface));
     if (!p->data || !p->surfs) {
@@ -536,7 +544,7 @@ static int pending_build(mesh_pending *p, const efx_meshdata *md) {
         *w++ = (uint32_t)s->index_count;
         efx_mesh_gpu_surface *g = &p->surfs[i];
         g->vertex_count = s->vertex_count;
-        g->index_count = s->index_count;
+        g->index_count = s->index_count ? s->index_count : s->vertex_count;
         g->interleaved = (const float *)w;
         /* defaults: normal +z, uv 0, color white (design D1) */
         for (int v = 0; v < s->vertex_count; v++) {
@@ -578,7 +586,10 @@ static int pending_build(mesh_pending *p, const efx_meshdata *md) {
             memcpy(w, s->indices, (size_t)s->index_count * sizeof(uint32_t));
             w += s->index_count;
         } else {
-            g->indices = NULL;
+            g->indices = (const uint32_t *)w;
+            for (int j = 0; j < s->vertex_count; j++) {
+                *w++ = (uint32_t)j;
+            }
         }
     }
     p->count = md->surface_count;

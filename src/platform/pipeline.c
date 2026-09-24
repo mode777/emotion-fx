@@ -133,9 +133,7 @@ static void pipe_destroy_mesh(void *ud, void *native) {
     if (m) {
         for (int i = 0; i < m->surface_count; i++) {
             sg_destroy_buffer(m->surfaces[i].vbuf);
-            if (m->surfaces[i].index_count) {
-                sg_destroy_buffer(m->surfaces[i].ibuf);
-            }
+            sg_destroy_buffer(m->surfaces[i].ibuf);
         }
         free(m->surfaces);
         free(m);
@@ -245,6 +243,9 @@ void efx_pipeline_install(void) {
         P.mesh_pip[i] = sg_make_pipeline(&(sg_pipeline_desc){
             .shader = P.mesh_shd,
             .primitive_type = SG_PRIMITIVETYPE_TRIANGLES,
+            /* mesh surfaces always draw indexed; non-indexed surfaces get
+               a synthesized identity index buffer at upload (render.c) */
+            .index_type = SG_INDEXTYPE_UINT32,
             .layout = {.buffers[0].stride = (int)sizeof(pipe_mesh_vertex),
                        .attrs = {[ATTR_mesh_a_pos] = {.format = SG_VERTEXFORMAT_FLOAT3},
                                  [ATTR_mesh_a_normal] = {.format = SG_VERTEXFORMAT_FLOAT3, .offset = 12},
@@ -318,19 +319,14 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
     sg_apply_uniforms(UB_fs_params, &(sg_range){.ptr = &fs, .size = sizeof(fs)});
     for (int i = 0; i < m->surface_count; i++) {
         pipe_mesh_surface *s = &m->surfaces[i];
-        if (!s->vertex_count) {
+        if (!s->index_count) {
             continue;
         }
         sg_bindings bnd = {0};
         bnd.vertex_buffers[0] = s->vbuf;
-        if (s->index_count) {
-            bnd.index_buffer = s->ibuf;
-            sg_apply_bindings(&bnd);
-            sg_draw(0, s->index_count, 1);
-        } else {
-            sg_apply_bindings(&bnd);
-            sg_draw(0, s->vertex_count, 1);
-        }
+        bnd.index_buffer = s->ibuf;
+        sg_apply_bindings(&bnd);
+        sg_draw(0, s->index_count, 1);
     }
 }
 
