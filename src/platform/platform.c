@@ -44,6 +44,22 @@ static void *g_cap_depth_mtl;
 static int g_cap_active;
 #endif
 
+/* surface sokol validation/creation errors on stderr (they are silent
+   otherwise and render as inexplicable missing geometry) */
+static void efx_sokol_log(const char *tag, uint32_t level,
+                          uint32_t item_id, const char *message,
+                          uint32_t line_nr, const char *filename,
+                          void *ud) {
+    (void)item_id;
+    (void)ud;
+    if (level <= 1) { /* panic + error */
+        fprintf(stderr, "sokol[%s] %s:%u: %s\n", tag,
+                filename ? filename : "?", line_nr,
+                message ? message : "<no message>");
+        fflush(stderr);
+    }
+}
+
 static sg_pass_action efx_pass_action(void) {
     sg_pass_action pa;
     memset(&pa, 0, sizeof(pa));
@@ -119,6 +135,7 @@ static void efx_capture_setup(void) {
 static void efx_init_cb(void) {
     sg_setup(&(sg_desc){
         .environment = sglue_environment(),
+        .logger = {.func = efx_sokol_log},
     });
     efx_pipeline_install();
 #ifdef SOKOL_METAL

@@ -298,12 +298,13 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
     efx_math_mul(pv, proj, view);
     efx_math_mul(mvp, pv, mr->transform);
     if (P.depth_remap) {
-        /* z' = 0.5*z + 0.5: GL-style clip range -> D3D11/Metal range;
+        /* row 2 of the clip matrix: z' = 0.5*z_clip + 0.5*w_clip maps the
+           GL-style (-1..1) range onto the D3D11/Metal (0..1) range;
            monotonic, so depth comparisons and ties are unchanged */
         mvp[2] *= 0.5f;
         mvp[6] *= 0.5f;
-        mvp[10] = mvp[10] * 0.5f + 0.5f;
-        mvp[14] *= 0.5f;
+        mvp[10] *= 0.5f;
+        mvp[14] = mvp[14] * 0.5f + mvp[15] * 0.5f;
     }
 
     vs_params_t vs;
@@ -315,8 +316,6 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
     fs.tint[3] = mr->color[3];
 
     sg_apply_pipeline(P.mesh_pip[mr->blend]);
-    sg_apply_uniforms(UB_vs_params, &(sg_range){.ptr = &vs, .size = sizeof(vs)});
-    sg_apply_uniforms(UB_fs_params, &(sg_range){.ptr = &fs, .size = sizeof(fs)});
     for (int i = 0; i < m->surface_count; i++) {
         pipe_mesh_surface *s = &m->surfaces[i];
         if (!s->index_count) {
@@ -326,6 +325,12 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
         bnd.vertex_buffers[0] = s->vbuf;
         bnd.index_buffer = s->ibuf;
         sg_apply_bindings(&bnd);
+        /* documented order: pipeline -> bindings -> uniforms -> draw; the
+           uniforms are per record, applied for every surface draw */
+        sg_apply_uniforms(UB_vs_params,
+                          &(sg_range){.ptr = &vs, .size = sizeof(vs)});
+        sg_apply_uniforms(UB_fs_params,
+                          &(sg_range){.ptr = &fs, .size = sizeof(fs)});
         sg_draw(0, s->index_count, 1);
     }
 }
