@@ -21,12 +21,11 @@ typedef struct {
     uint8_t r, g, b, a;
 } pipe_vertex;
 
-/* interleaved mesh vertex: pos(3f) normal(3f) uv(2f) color(4f) = 48 bytes
- * (design D1: all attribute slots present, defaults filled at upload) */
+/* interleaved mesh vertex: pos(3f) color(4f) = 28 bytes — the F3 canned
+ * shader consumes only position and color; normals/uvs stay in MeshData
+ * storage and join the GPU layout in F4 (design D1, amended) */
 typedef struct {
     float x, y, z;
-    float nx, ny, nz;
-    float u, v;
     float r, g, b, a;
 } pipe_mesh_vertex;
 
@@ -312,9 +311,9 @@ void efx_pipeline_install(void) {
                 : (sg_vertex_layout_state){
                       .buffers[0].stride = (int)sizeof(pipe_mesh_vertex),
                       .attrs = {[ATTR_mesh_a_pos] = {.format = SG_VERTEXFORMAT_FLOAT3, .offset = 0},
-                                [ATTR_mesh_a_color] = {.format = SG_VERTEXFORMAT_FLOAT4, .offset = 32}}},
-            /* slots 2 (normal @12) and 3 (uv @24) join in F4 when the
-               canned shader starts consuming them */
+                                [ATTR_mesh_a_color] = {.format = SG_VERTEXFORMAT_FLOAT4, .offset = 12}}},
+            /* slots 2 (normal) and 3 (uv) join in F4 when the canned
+               shader starts consuming them */
             .colors[0] = {.pixel_format = SG_PIXELFORMAT_RGBA8,
                           .blend = blends[i]},
             .depth = {.compare = SG_COMPAREFUNC_LESS_EQUAL,
