@@ -465,11 +465,9 @@ void efx_pipeline_play(void) {
              0.5f, -0.5f, 0.0f, 0, 1, 0, 1,
              0.0f,  0.5f, 0.0f, 0, 0, 1, 1,
         };
-        static sg_buffer qb, qib, tb, tib;
+        static sg_buffer qib, tb, tib;
         static int bufs_init;
         if (!bufs_init) {
-            qb = sg_make_buffer(&(sg_buffer_desc){
-                .data = {.ptr = qv, .size = sizeof(qv)}});
             static const uint32_t qidx[3] = {0, 1, 2};
             qib = sg_make_buffer(&(sg_buffer_desc){
                 .usage = {.index_buffer = true}, .data = SG_RANGE(qidx)});
@@ -480,10 +478,13 @@ void efx_pipeline_play(void) {
             bufs_init = 1;
         }
         if (probe <= 2) {
-            /* quad pipeline + quad-format strip/triangles */
+            /* probe 1: F2-identical dynamic update + strip draw.
+               probe 2: same but TRIANGLES via a u32 index buffer. */
+            sg_update_buffer(P.vbuf, &(sg_range){.ptr = qv,
+                                                 .size = sizeof(qv)});
             sg_apply_pipeline(P.quad_pip[0]);
             sg_bindings bnd = {0};
-            bnd.vertex_buffers[0] = qb;
+            bnd.vertex_buffers[0] = P.vbuf;
             if (probe == 2) {
                 bnd.index_buffer = qib;
                 sg_apply_bindings(&bnd);
@@ -492,6 +493,36 @@ void efx_pipeline_play(void) {
                 sg_apply_bindings(&bnd);
                 sg_draw(0, 4, 1);
             }
+        } else if (probe == 4) {
+            /* mesh pipeline with DYNAMIC vertex/index buffers */
+            static sg_buffer dtb, dtib;
+            static int dinit;
+            if (!dinit) {
+                dtb = sg_make_buffer(&(sg_buffer_desc){
+                    .size = sizeof(tri),
+                    .usage = {.vertex_buffer = true, .dynamic_update = true}});
+                dtib = sg_make_buffer(&(sg_buffer_desc){
+                    .size = 3 * sizeof(uint32_t),
+                    .usage = {.index_buffer = true, .dynamic_update = true}});
+                static const uint32_t z[3] = {0, 1, 2};
+                sg_update_buffer(dtib, &(sg_range){.ptr = z, .size = sizeof(z)});
+                dinit = 1;
+            }
+            sg_update_buffer(dtb, &(sg_range){.ptr = tri, .size = sizeof(tri)});
+            vs_params_t vs;
+            memcpy(vs.mvp0, (const float[4]){1, 0, 0, 0}, 16);
+            memcpy(vs.mvp1, (const float[4]){0, 1, 0, 0}, 16);
+            memcpy(vs.mvp2, (const float[4]){0, 0, 1, 0}, 16);
+            memcpy(vs.mvp3, (const float[4]){0, 0, 0, 1}, 16);
+            vs.tint[0] = 1; vs.tint[1] = 1; vs.tint[2] = 1; vs.tint[3] = 1;
+            sg_apply_pipeline(P.mesh_pip[0]);
+            sg_bindings bnd = {0};
+            bnd.vertex_buffers[0] = dtb;
+            bnd.index_buffer = dtib;
+            sg_apply_bindings(&bnd);
+            sg_apply_uniforms(UB_vs_params,
+                              &(sg_range){.ptr = &vs, .size = sizeof(vs)});
+            sg_draw(0, 3, 1);
         } else {
             vs_params_t vs;
             memcpy(vs.mvp0, (const float[4]){1, 0, 0, 0}, 16);
