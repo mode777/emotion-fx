@@ -395,11 +395,15 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
     }
 
     vs_params_t vs;
-    /* std140 vec4 rows = column-major columns of the clip matrix */
-    memcpy(vs.mvp0, mvp, 16);
-    memcpy(vs.mvp1, mvp + 4, 16);
-    memcpy(vs.mvp2, mvp + 8, 16);
-    memcpy(vs.mvp3, mvp + 12, 16);
+    /* the shader computes clip = vec4(dot(mvp0,p), ...) so each vec4 is a
+       ROW of the clip matrix: rows[r] = {m[r], m[4+r], m[8+r], m[12+r]} */
+    for (int row = 0; row < 4; row++) {
+        float *dst = (row == 0) ? vs.mvp0 : (row == 1) ? vs.mvp1
+                   : (row == 2) ? vs.mvp2 : vs.mvp3;
+        for (int c = 0; c < 4; c++) {
+            dst[c] = mvp[c * 4 + row];
+        }
+    }
     vs.tint[0] = mr->color[0];
     vs.tint[1] = mr->color[1];
     vs.tint[2] = mr->color[2];
