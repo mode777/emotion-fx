@@ -147,7 +147,13 @@ branch so a manual dispatch from another ref is a no-op rather than a
 protected-environment failure. It SHALL build the same Emscripten web-player
 target the gate builds and deploy it with the GitHub Pages actions, and its
 Emscripten toolchain SHALL be pinned consistently with the rest of CI
-(ADR 0020).
+(ADR 0020). The deployed content SHALL include the complete output file set
+of that target — HTML loader, JS glue, wasm module, and the preloaded data
+file the JS glue fetches at startup (currently `player_web.html`,
+`player_web.js`, `player_web.wasm`, and `player_web.data`) — so the deployed
+demo loads without missing-resource errors. The workflow SHALL check that
+every expected output file exists before publishing and SHALL fail when one
+is absent rather than deploy an incomplete set.
 
 #### Scenario: Default-branch push deploys the web player
 - **WHEN** a commit is pushed to the default branch
@@ -168,6 +174,18 @@ Emscripten toolchain SHALL be pinned consistently with the rest of CI
 - **WHEN** a gate run completes, whether triggered by a tag or manually
 - **THEN** the gate workflow contains no Pages deployment job, so the run's
   status reflects only the verification (and tag-release) jobs
+
+#### Scenario: Deployed site serves the complete web player
+- **WHEN** the Pages workflow deploys from the default branch
+- **THEN** every file of the web player's output set is reachable at the
+  deployed URL — in particular the preloaded data file returns 200, not
+  404 — and the demo starts without resource-load errors
+
+#### Scenario: Missing output file fails the deploy
+- **WHEN** a file expected by the Pages collect step is absent from the
+  build output
+- **THEN** the collect step fails and the workflow publishes no deployment,
+  instead of silently deploying an incomplete web player
 
 ### Requirement: Downloadable per-target build artifacts
 Every gate run SHALL package the built player for each supported target

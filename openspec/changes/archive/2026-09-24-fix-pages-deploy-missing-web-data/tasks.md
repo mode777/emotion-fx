@@ -21,4 +21,4 @@ is the Pages deploy itself plus live-site checks (design D2).
 
 ## 3. Wrap-up
 
-- [ ] 3.1 Confirm the `verification` spec delta ("Deployed site serves the complete web player", "Missing output file fails the deploy") matches the shipped behavior, then mark tasks complete and close the change via the archive workflow. Verify: `npx openspec validate --strict` passes for this change before archiving.
+- [x] 3.1 Confirm the `verification` spec delta ("Deployed site serves the complete web player", "Missing output file fails the deploy") matches the shipped behavior, then mark tasks complete and close the change via the archive workflow. Verify: `npx openspec validate --strict` passes for this change before archiving.
