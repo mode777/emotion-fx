@@ -37,9 +37,13 @@ jobs:
 
       - name: Collect pages content
         run: |
+          set -euo pipefail
+          for f in player_web.html player_web.js player_web.wasm player_web.data; do
+            test -f "build-web/$f" || { echo "missing build-web/$f" >&2; exit 1; }
+          done
           mkdir pages
           cp build-web/player_web.html pages/index.html
-          cp build-web/player_web.js build-web/player_web.wasm pages/
+          cp build-web/player_web.js build-web/player_web.wasm build-web/player_web.data pages/
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
