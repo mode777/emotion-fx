@@ -14,10 +14,10 @@ is the Pages deploy itself plus live-site checks (design D2).
 
 ## 2. Deploy and live-site verification
 
-- [ ] 2.1 Branch, commit the one-step workflow change, and merge to `main` (Pages deploys only from the default branch — design Context). Verify: the push starts a `pages` workflow run (`gh run list --workflow=pages.yml`).
-- [ ] 2.2 Watch the `pages` run to completion and confirm it is green, including the existence-check step. Verify: `gh run view <run-id>` shows the deploy job succeeded; if the existence check fails, fix the file list in the same branch and re-merge.
-- [ ] 2.3 Verify the deployed file set over HTTP with a cache-busting query: `curl -s -o /dev/null -w "%{http_code} %\\n" "https://mode777.github.io/emotion-fx/player_web.data?cb=$(date +%s)"` for `.data` (the regression), plus `.js`, `.wasm`, and the page itself. Verify: all return 200 with non-zero size — `.data` was 404 before the fix.
-- [ ] 2.4 Verify the demo actually boots: load <https://mode777.github.io/emotion-fx/> in a browser with the console open. Verify: no `player_web.data` 404, no `Uncaught Error` from the Emscripten loader (`xhr.onload`), and the demo window renders and animates.
+- [x] 2.1 Branch, commit the one-step workflow change, and merge to `main` (Pages deploys only from the default branch — design Context). Verify: the push starts a `pages` workflow run (`gh run list --workflow=pages.yml`).
+- [x] 2.2 Watch the `pages` run to completion and confirm it is green, including the existence-check step. Verify: `gh run view <run-id>` shows the deploy job succeeded; if the existence check fails, fix the file list in the same branch and re-merge.
+- [x] 2.3 Verify the deployed file set over HTTP with a cache-busting query: `curl -s -o /dev/null -w "%{http_code} %\\n" "https://mode777.github.io/emotion-fx/player_web.data?cb=$(date +%s)"` for `.data` (the regression), plus `.js`, `.wasm`, and the page itself. Verify: all return 200 with non-zero size — `.data` was 404 before the fix.
+- [x] 2.4 Verify the demo actually boots: load <https://mode777.github.io/emotion-fx/> in a browser with the console open. Verify: no `player_web.data` 404, no `Uncaught Error` from the Emscripten loader (`xhr.onload`), and the demo window renders and animates.
 
 ## 3. Wrap-up
 
