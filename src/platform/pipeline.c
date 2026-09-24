@@ -430,41 +430,75 @@ void efx_pipeline_play(void) {
         return;
     }
     if (DIAG_HARDCUBE) {
-        /* TEMPORARY: single hardcoded triangle straight through the mesh
-           pipeline — bypasses records, JS, MeshData, pending uploads */
+        /* TEMPORARY: hardcoded geometry straight through the pipelines —
+           bypasses records, JS, MeshData, pending uploads.
+           EFX_DIAG_PROBE=1: quad pipeline + strip (known-good baseline)
+           EFX_DIAG_PROBE=2: quad pipeline + TRIANGLES + u32 index buffer
+           EFX_DIAG_PROBE=3: mesh pipeline + TRIANGLES + u32 index buffer */
+        int probe = 1;
+        const char *pv = getenv("EFX_DIAG_PROBE");
+        if (pv && *pv) {
+            probe = *pv - '0';
+        }
+        /* quad-format verts (stride 20: float2 pos, float2 uv, ub4n rgba),
+           3 vertices in NDC */
+        static const uint8_t qv[3 * 20] = {
+            /* x                     y                     u   v   rgba */
+            0, 0, 0, 0xbf, 0, 0, 0, 0xbf, 0, 0, 0, 0, 255, 0, 0, 255,
+            0, 0, 0, 0x3f, 0, 0, 0, 0xbf, 0, 0, 0x80, 0x3f, 0, 255, 0, 255,
+            0, 0, 0, 0, 0, 0, 0, 0x3f, 0, 0, 0, 0, 0, 0, 255, 255,
+        };
         static const float tri[7 * 3] = {
             -0.5f, -0.5f, 0.0f, 1, 0, 0, 1,
              0.5f, -0.5f, 0.0f, 0, 1, 0, 1,
              0.0f,  0.5f, 0.0f, 0, 0, 1, 1,
         };
-        static sg_buffer tb, tib;
-        static int tb_init;
-        if (!tb_init) {
-            tb = sg_make_buffer(&(sg_buffer_desc){
-                .data = SG_RANGE(tri)});
+        static sg_buffer qb, qib, tb, tib;
+        static int bufs_init;
+        if (!bufs_init) {
+            qb = sg_make_buffer(&(sg_buffer_desc){
+                .data = {.ptr = qv, .size = sizeof(qv)}});
+            static const uint32_t qidx[3] = {0, 1, 2};
+            qib = sg_make_buffer(&(sg_buffer_desc){
+                .usage = {.index_buffer = true}, .data = SG_RANGE(qidx)});
+            tb = sg_make_buffer(&(sg_buffer_desc){.data = SG_RANGE(tri)});
             static const uint32_t tidx[3] = {0, 1, 2};
             tib = sg_make_buffer(&(sg_buffer_desc){
-                .usage = {.index_buffer = true},
-                .data = SG_RANGE(tidx)});
-            tb_init = 1;
+                .usage = {.index_buffer = true}, .data = SG_RANGE(tidx)});
+            bufs_init = 1;
         }
-        vs_params_t vs;
-        memcpy(vs.mvp0, (const float[4]){1, 0, 0, 0}, 16);
-        memcpy(vs.mvp1, (const float[4]){0, 1, 0, 0}, 16);
-        memcpy(vs.mvp2, (const float[4]){0, 0, 1, 0}, 16);
-        memcpy(vs.mvp3, (const float[4]){0, 0, 0, 1}, 16);
-        vs.tint[0] = 1;
-        vs.tint[1] = 1;
-        vs.tint[2] = 1;
-        vs.tint[3] = 1;
-        sg_apply_pipeline(P.mesh_pip[0]);
-        sg_bindings bnd = {0};
-        bnd.vertex_buffers[0] = tb;
-        bnd.index_buffer = tib;
-        sg_apply_bindings(&bnd);
-        sg_apply_uniforms(UB_vs_params,
-                          &(sg_range){.ptr = &vs, .size = sizeof(vs)});
-        sg_draw(0, 3, 1);
+        if (probe <= 2) {
+            /* quad pipeline + quad-format strip/triangles */
+            sg_apply_pipeline(P.quad_pip[0]);
+            sg_bindings bnd = {0};
+            bnd.vertex_buffers[0] = qb;
+            if (probe == 2) {
+                bnd.index_buffer = qib;
+                sg_apply_bindings(&bnd);
+                sg_draw(0, 3, 1);
+            } else {
+                sg_apply_bindings(&bnd);
+                sg_draw(0, 4, 1);
+            }
+        } else {
+            vs_params_t vs;
+            memcpy(vs.mvp0, (const float[4]){1, 0, 0, 0}, 16);
+            memcpy(vs.mvp1, (const float[4]){0, 1, 0, 0}, 16);
+            memcpy(vs.mvp2, (const float[4]){0, 0, 1, 0}, 16);
+            memcpy(vs.mvp3, (const float[4]){0, 0, 0, 1}, 16);
+            vs.tint[0] = 1;
+            vs.tint[1] = 1;
+            vs.tint[2] = 1;
+            vs.tint[3] = 1;
+            sg_apply_pipeline(P.mesh_pip[0]);
+            sg_bindings bnd = {0};
+            bnd.vertex_buffers[0] = tb;
+            bnd.index_buffer = tib;
+            sg_apply_bindings(&bnd);
+            sg_apply_uniforms(UB_vs_params,
+                              &(sg_range){.ptr = &vs, .size = sizeof(vs)});
+            sg_draw(0, 3, 1);
+        }
         return;
     }
     int count = 0;
