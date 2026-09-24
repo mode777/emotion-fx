@@ -32,12 +32,12 @@
 
 ## 3. Web bridge parity (ADR 0022)
 
-- [ ] 3.1 Reshape `drawQuad` in `src/web/entry.js` to the identical contract
+- [x] 3.1 Reshape `drawQuad` in `src/web/entry.js` to the identical contract
   (ES5 style: derivation order, `size`/`origin` validation, zero-extent
   `RangeError`, default center pivot) and extend `src/web/bridge.c` to forward
   the origin through `_efx_bridge_draw_quad`. Verify: `tools/run_web_compare.mjs`
   reports desktop vs web parity for the quad paths; Emscripten build clean.
-- [ ] 3.2 Add `width`/`height` properties to the web `EfxTexture` class backed
+- [x] 3.2 Add `width`/`height` properties to the web `EfxTexture` class backed
   by the existing `_efx_bridge_texture_width/height` entry points, throwing
   `TypeError` on a destroyed texture, mirroring 2.2 exactly. Verify: the same
   getter smoke script runs identically on the web runtime (web compare /
@@ -56,12 +56,12 @@
   `s_resource_lifecycle.js`, …) to the new signature and add new-throw and
   getter cases, staying free of Node/browser dependencies. Verify: ctest smoke
   suite green on desktop and through the web bridge.
-- [ ] 4.3 Rewrite the six golden scenes (`tests/goldens/*/main.js`) to the new
+- [x] 4.3 Rewrite the six golden scenes (`tests/goldens/*/main.js`) to the new
   signature — drop `w`/`h` where it equals the derived size, pass explicit
   `size` where scenes stretch or draw `whiteTexture` (derives to 1×1) — and do
   NOT touch the committed PNGs. Verify: golden-image harness (ctest with
   `-DEFX_BUILD_GOLDEN_TESTS=ON` under `xvfb-run`) passes with zero PNG changes.
-- [ ] 4.4 Add a new `origin` golden scene covering 1:1 derived draw,
+- [x] 4.4 Add a new `origin` golden scene covering 1:1 derived draw,
   sourceRect-derived size, `size` + `scale` ordering, and an off-center pivot
   under rotation; register it in the golden test list and capture its expected
   PNG via `--capture-frame` on the canonical rasterizer (llvmpipe; capture on
@@ -70,7 +70,7 @@
 
 ## 5. Call sites and docs
 
-- [ ] 5.1 Rewrite `examples/browser/main.js` to the new signature. Verify: the
+- [x] 5.1 Rewrite `examples/browser/main.js` to the new signature. Verify: the
   Emscripten web bundle builds and the demo renders correctly (headless-Chrome
   spot check or manual load of the built page).
 - [x] 5.2 Audit the repo for stale call sites: `grep -rn "drawQuad("` across
@@ -87,11 +87,11 @@
 
 ## 6. Verification gate (F2 follow-up: full four-target matrix, ADR 0020/0023)
 
-- [ ] 6.1 Local Linux pipeline: configure with `-DEFX_BUILD_GOLDEN_TESTS=ON`,
+- [x] 6.1 Local Linux pipeline: configure with `-DEFX_BUILD_GOLDEN_TESTS=ON`,
   build, run the full ctest suite (smoke, unit, all golden scenes incl.
   `origin`), then the Emscripten build + web golden suite in headless Chrome.
   Verify: all green locally before any push.
-- [ ] 6.2 Commit to a branch, push, and run the SSH pre-filter:
+- [x] 6.2 Commit to a branch, push, and run the SSH pre-filter:
   `python3 tools/verify_remote.py all <branch>` (credentials from
   `SSH_HOST`/`SSH_USER`/`SSH_PASSWORD` env only). Fix and re-verify until
   green; do not dispatch GitHub Actions before this passes.
