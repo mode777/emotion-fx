@@ -26,11 +26,11 @@ jobs:
       - name: Build player
         shell: bash
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-DSOKOL_DEBUG" -DCMAKE_CXX_FLAGS="-DSOKOL_DEBUG"
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake --build build --config Release --target player -j4
+            cmake --build build --config Release --target player efx_imgdiff -j4
           else
-            cmake --build build --target player -j4
+            cmake --build build --target player efx_imgdiff -j4
           fi
       - name: Diagnostic capture matrix
         shell: bash
