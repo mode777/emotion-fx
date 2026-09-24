@@ -440,12 +440,13 @@ void efx_pipeline_play(void) {
         if (pv && *pv) {
             probe = *pv - '0';
         }
-        /* probe 1: FULL-SCREEN quad — unmistakable if it renders */
-        static const float qv[4 * 5] = {
-            -1.0f, -1.0f, 0.0f, 0.0f, 255, 0, 0, 255,
-             1.0f, -1.0f, 1.0f, 0.0f, 255, 0, 0, 255,
-            -1.0f,  1.0f, 0.0f, 1.0f, 255, 0, 0, 255,
-             1.0f,  1.0f, 1.0f, 1.0f, 255, 0, 0, 255,
+        /* probe 1: FULL-SCREEN quad — unmistakable if it renders.
+           stride 20: float2 pos, float2 uv, ub4n rgba */
+        static const uint8_t qv[4 * 20] = {
+            0, 0, 0, 0xbf, 0, 0, 0, 0xbf, 0, 0, 0, 0, 255, 0, 0, 255,
+            0, 0, 0, 0x3f, 0, 0, 0, 0xbf, 0, 0, 0x80, 0x3f, 255, 0, 0, 255,
+            0, 0, 0, 0xbf, 0, 0, 0, 0x3f, 0, 0, 0x80, 0x3f, 255, 0, 0, 255,
+            0, 0, 0, 0x3f, 0, 0, 0, 0x3f, 0, 0, 0x80, 0x3f, 255, 0, 0, 255,
         };
         static const float tri[7 * 3] = {
             -0.5f, -0.5f, 0.0f, 1, 0, 0, 1,
