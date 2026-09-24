@@ -48,9 +48,10 @@ reference SHALL be tagged with its layer.
 Every engine resource type that scripts can create or reference SHALL be
 classified in the reference as exactly one of: JS-managed (plain script
 objects, garbage collected), native-backed class (an opaque JS object
-wrapping a native handle with an explicit `destroy()` release method —
-fully opaque at first; query methods, getters, and setters are reserved for
-later), or slot-based (a fixed pre-allocated bank of indexed resources).
+wrapping a native handle with an explicit `destroy()` release method; such a
+class MAY additionally expose documented read-only query properties, which
+MUST be listed in the reference — the first instance is Texture's `width` and
+`height`), or slot-based (a fixed pre-allocated bank of indexed resources).
 The native-backed classes SHALL be exactly: MeshData, ImageData, Mesh,
 Texture, and RenderTarget; skins, skeletons, and animation clips are
 implicit Mesh payload — loaded with the mesh and posed by the script
@@ -83,6 +84,11 @@ and 1 camera; lights are the only slot bank.
   recorded earlier in the same frame
 - **THEN** the native release is deferred until playback completes, and
   subsequent use of the destroyed resource throws
+
+#### Scenario: Query properties are documented per class
+- **WHEN** the reference document's Texture entry is read
+- **THEN** it lists the read-only `width` and `height` query properties, and
+  every other native-backed class entry states that it has none
 
 #### Scenario: Resource without a classification
 - **WHEN** a change proposes exposing a new resource type to scripts without
