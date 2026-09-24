@@ -22,20 +22,25 @@ jobs:
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build player
-        run: cmake --build build --target player -j4
+        shell: bash
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --build build --config Release --target player -j4
+          else
+            cmake --build build --target player -j4
+          fi
       - name: Diagnostic capture matrix
         shell: bash
         run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then PLAYER=build/Release/player.exe; else PLAYER=build/player; fi
           mkdir -p diag
-          for nocull in 0 1; do
-            for noremap in 0 1; do
-              for nodepth in 0 1; do
-                tag="cull${nocull}_remap${noremap}_depth${nodepth}"
-                export EFX_DIAG_NOCULL=$nocull EFX_DIAG_NOREMAP=$noremap EFX_DIAG_NODEPTH=$nodepth
-                for scene in cube3d depth3d surfaces3d; do
-                  ./build/player --capture-frame 2 --capture-output "diag/${scene}-${tag}.png" tests/goldens/$scene || echo "capture failed: $scene $tag"
-                done
-              done
+          for combo in "0_0_0_0_0" "0_1_0_0_0" "1_0_0_0_0" "0_0_1_0_0" "0_0_0_1_0" "0_0_0_0_1" "1_1_1_1_1"; do
+            IFS=_ read nocull noremap nodepth noib constz <<< "$combo"
+            tag="cul${nocull}_rem${noremap}_dep${nodepth}_ib${noib}_cz${constz}"
+            export EFX_DIAG_NOCULL=$nocull EFX_DIAG_NOREMAP=$noremap EFX_DIAG_NODEPTH=$nodepth EFX_DIAG_NOIB=$noib EFX_DIAG_CONSTZ=$constz
+            for scene in cube3d depth3d surfaces3d; do
+              "$PLAYER" --capture-frame 2 --capture-output "diag/${scene}-${tag}.png" tests/goldens/$scene || echo "capture failed: $scene $tag"
             done
           done
       - name: Upload diagnostic captures
