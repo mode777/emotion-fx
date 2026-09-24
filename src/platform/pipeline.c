@@ -239,6 +239,16 @@ void efx_pipeline_install(void) {
     }
     memset(&P, 0, sizeof(P));
 
+    /* TEMPORARY F3 diagnostics: read BEFORE pipeline creation so the
+       pipeline-shape toggles take effect */
+    P.diag_nocull = diag_env("EFX_DIAG_NOCULL");
+    P.diag_noremap = diag_env("EFX_DIAG_NOREMAP");
+    P.diag_nodepth = diag_env("EFX_DIAG_NODEPTH");
+    DIAG_NOIB = diag_env("EFX_DIAG_NOIB");
+    DIAG_CONSTZ = diag_env("EFX_DIAG_CONSTZ");
+    DIAG_POSONLY = diag_env("EFX_DIAG_POSONLY");
+    DIAG_U16 = diag_env("EFX_DIAG_U16");
+
     P.quad_shd = sg_make_shader(quad_shader_desc(sg_query_backend()));
     P.mesh_shd = sg_make_shader(mesh_shader_desc(sg_query_backend()));
 
@@ -321,14 +331,6 @@ void efx_pipeline_install(void) {
     /* D3D11/Metal use a 0..1 depth range: fold the GL-style (-1..1)
        projection into clip space at playback (design D3/D4) */
     P.depth_remap = sg_query_features().origin_top_left ? 1 : 0;
-    /* TEMPORARY F3 diagnostics */
-    P.diag_nocull = diag_env("EFX_DIAG_NOCULL");
-    P.diag_noremap = diag_env("EFX_DIAG_NOREMAP");
-    P.diag_nodepth = diag_env("EFX_DIAG_NODEPTH");
-    DIAG_NOIB = diag_env("EFX_DIAG_NOIB");
-    DIAG_CONSTZ = diag_env("EFX_DIAG_CONSTZ");
-    DIAG_POSONLY = diag_env("EFX_DIAG_POSONLY");
-    DIAG_U16 = diag_env("EFX_DIAG_U16");
 
     P.smp = sg_make_sampler(&(sg_sampler_desc){.min_filter = SG_FILTER_LINEAR,
                                                .mag_filter = SG_FILTER_LINEAR});
