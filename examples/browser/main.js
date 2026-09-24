@@ -1,4 +1,4 @@
-// Golden gallery (f2b visual demo): cycles the six golden-image scenes
+// Golden gallery (f2c visual demo): cycles the seven golden-image scenes
 // through the public F2 API. Each scene reproduces its committed capture
 // under tests/goldens/<name>/golden.png on a 640x480 virtual frame; a
 // progress strip at the bottom shows the cycle position.
@@ -109,6 +109,37 @@ const scenes = [
                     });
                 }
             }
+        },
+    },
+    {
+        name: 'origin',
+        setup() {
+            efx.setClearColor([0.02, 0.06, 0.1, 1]);
+            efx.setCamera2D({ frame: FRAME });
+            const pixels = [];
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 16; x++) {
+                    if (x < 8) {
+                        pixels.push(230, 140, 30, 255);
+                    } else {
+                        pixels.push(30, 160, 170, 255);
+                    }
+                }
+            }
+            this.tex = efx.createTexture(
+                efx.createImageData({ width: 16, height: 8, pixels: pixels }));
+        },
+        render() {
+            // size derivation: 1:1 texture-size draw and a
+            // sourceRect-derived size, both untransformed
+            efx.drawQuad(24, 20, this.tex);
+            efx.drawQuad(60, 20, this.tex, { sourceRect: { x: 0, y: 0, w: 8, h: 8 } });
+            // scale applies after the size is determined
+            efx.drawQuad(224, 216, this.tex, { size: [64, 16], scale: 3 });
+            // origin moves the pivot: rotation 90 around quad-local (4, 4)
+            efx.drawQuad(96, 340, this.tex, { size: [128, 64], origin: [4, 4], rotation: 90 });
+            // corner pivot with derived size, rotation + scale combined
+            efx.drawQuad(460, 320, this.tex, { origin: [0, 0], rotation: 45, scale: 1.5 });
         },
     },
 ];

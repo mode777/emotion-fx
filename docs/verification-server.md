@@ -93,6 +93,23 @@ means every requested suite passed.
 - The remote checkout may lag `origin` or sit on an old branch; the
   script's sync step (fetch + hard reset to the verified SHA) makes that
   harmless.
+- **Adding a golden scene requires a server-side capture first** (f2c,
+  2026-09). A scene's test only activates once `golden.png` is committed,
+  and the web golden driver fails on scenes whose PNG is missing — but
+  captures need llvmpipe, which only exists here. `verify_remote.py` has
+  no capture suite, so the flow is: push the branch without the PNG →
+  over SSH: sync the checkout to the pushed SHA, build the native player,
+  run `xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 ./build/player
+  --capture-frame 2 --capture-output <out>.png tests/goldens/<scene>`
+  (twice, imgdiffing the two captures as a determinism check), SFTP the
+  PNG into the repo, commit, push — and only then `verify_remote.py all`.
+- **CI runner watch item**: `ubuntu-latest` migrates to Ubuntu 26 from
+  2026-10-19 (GitHub runner-images notice, observed 2026-09). That may
+  bump Mesa/llvmpipe in the canonical `build+test (ubuntu-latest)` golden
+  job; this server's llvmpipe is pinned only by the distro. If goldens
+  drift after the migration, apply ADR 0020's tolerance/re-baseline rules
+  and re-capture here so both golden jobs stay on the same rasterizer
+  generation.
 
 ## Security notes
 

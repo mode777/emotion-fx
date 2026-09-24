@@ -145,3 +145,41 @@ macOS triage order, ADR 0020/0023).
 None — the material choices (signature shape, origin semantics, getter
 scope) were settled with the user before proposal; the rest is pinned in the
 spec deltas.
+
+## Apply notes — infrastructure quirks
+
+Glitches and quirks hit while implementing (kept in the change record; the
+durable ones are mirrored in `docs/verification-server.md`):
+
+- **openspec CLI ignores `rules.design`** — every `openspec` invocation
+  printed `Rules for 'design' must be an array of strings, ignoring this
+  artifact's rules`, although `openspec/config.yaml`'s `rules.design` is a
+  well-formed array of strings. CLI-side parsing issue (package version
+  pinned via package.json); the design rules were still honored because the
+  config was read directly during planning. Cosmetic but noisy; revisit on
+  CLI upgrade.
+- **No capture mode in the verification tooling** — adding a golden scene
+  needs `golden.png` committed before `verify_remote.py web` can pass (the
+  web driver enumerates every scene dir), but captures are only possible on
+  the server (llvmpipe). `verify_remote.py` has no `capture` suite, so this
+  change used a one-off SSH script: sync branch → build player →
+  `xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 player --capture-frame 2` twice →
+  `efx_imgdiff` determinism check → SFTP the PNG back. Now documented as the
+  standard flow in `docs/verification-server.md`.
+- **tasks.md checkbox glitch** — the edit marking task 5.3 done reported
+  success but the committed file still contained `- [ ]` (caught by a
+  post-commit grep; fixed in 3459cb6). One-off tooling glitch, no content
+  impact.
+- **`/tmp/opencode` not writable** — the tool description claims it is
+  pre-approved for scratch work, but it is root-owned in this container
+  (the workspace-global AGENTS.md already warns this). Plain `/tmp` works.
+- **Local build cache footgun** — the local `build/` was configured with
+  `-DEFX_BUILD_GOLDEN_TESTS=ON`, so bare `ctest` fails in this
+  display-less container; use `ctest -E golden` locally and let the
+  server/gate run goldens (matches `docs/verification-server.md`).
+- **GitHub runner watch items (observed in gate run 35989619506 logs)** —
+  actions are forced from deprecated Node 20 onto Node 24 (cosmetic), and
+  GitHub announced `ubuntu-latest` migrates to Ubuntu 26 from 2026-10-19.
+  The migration may bump Mesa/llvmpipe in the canonical golden job; if
+  golden drift appears after that date, the tolerance/re-baseline rules of
+  ADR 0020 apply.
