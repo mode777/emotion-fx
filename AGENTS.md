@@ -35,10 +35,12 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   everywhere (on Emscripten the smoke suite runs the same portable scripts
   through the native bridge with the host JS engine as the runtime, plus
   `tools/run_web_compare.mjs` diffs desktop vs web output); golden-image
-  tests (6 committed scenes under `tests/goldens/`) run where a display
+  tests (7 committed scenes under `tests/goldens/`) run where a display
   exists — Linux CI under `xvfb-run` + llvmpipe, Emscripten in pinned
   headless Chrome (ADR 0020). Local builds without a display configure with
-  `-DEFX_BUILD_GOLDEN_TESTS=OFF` (the default).
+  `-DEFX_BUILD_GOLDEN_TESTS=OFF` (the default); if a local build dir was
+  configured with `ON`, exclude them (`ctest -E golden`) — goldens fail
+  without a display.
 - **CI runs on tags and manually, never per push (ADR 0023).**
   `.github/workflows/ci.yml` triggers only on `v*` tags and
   `workflow_dispatch` (`gh workflow run ci.yml`); ordinary branch pushes
@@ -69,7 +71,11 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   order and the four-target gate still apply as above. Credentials come
   from the `SSH_HOST` / `SSH_USER` / `SSH_PASSWORD` env vars only — never
   commit them or the server's identity. Details and quirks:
-  `docs/verification-server.md`.
+  `docs/verification-server.md`. Known quirks: adding a golden scene
+  requires a manual server-side capture before verification (llvmpipe
+  only; recipe in that doc), and `ubuntu-latest` moves to Ubuntu 26 on
+  2026-10-19, which may bump llvmpipe and require a golden re-baseline
+  per ADR 0020.
 - **Agents may commit and push to run the gate.** Because CI never fires on
   an ordinary push (ADR 0023), an agent verifying a change MAY create a
   branch, commit, and push for the sole purpose of dispatching
@@ -80,6 +86,11 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   `openspec` binary is not on PATH: run `npm install` once, then invoke
   commands as `npx openspec <command>` from the repo root (e.g.
   `npx openspec status --change <name>`, `npx openspec validate --strict`).
+  Known CLI noise: every command prints `Rules for 'design' must be an
+  array of strings, ignoring this artifact's rules` even though
+  `openspec/config.yaml` is well-formed — a CLI-side parse issue
+  (f2c apply notes); honor the design rules by reading the config
+  directly instead of chasing the warning.
 
 ## Stack
 
