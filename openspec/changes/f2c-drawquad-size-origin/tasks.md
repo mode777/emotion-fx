@@ -77,7 +77,7 @@
   `src/`, `tests/`, `examples/`, `docs/`, `README.md` (archived change records
   under `openspec/changes/archive/` are historical and stay untouched). Verify:
   no live call site uses the old 6-argument positional form.
-- [ ] 5.3 Update `docs/js-api.md`: rewrite the F2 `drawQuad` entry (signature,
+- [x] 5.3 Update `docs/js-api.md`: rewrite the F2 `drawQuad` entry (signature,
   derivation order, `size`, `origin`, zero-extent rule, error types) and the
   Texture resource entry (`width`/`height` getters), refresh the F2 sample and
   the F5 provisional sample to the new shape; update the README `drawQuad`
