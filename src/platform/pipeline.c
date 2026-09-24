@@ -433,11 +433,15 @@ void efx_pipeline_play(void) {
              0.5f, -0.5f, 0.0f, 0, 1, 0, 1,
              0.0f,  0.5f, 0.0f, 0, 0, 1, 1,
         };
-        static sg_buffer tb;
+        static sg_buffer tb, tib;
         static int tb_init;
         if (!tb_init) {
             tb = sg_make_buffer(&(sg_buffer_desc){
                 .data = SG_RANGE(tri)});
+            static const uint32_t tidx[3] = {0, 1, 2};
+            tib = sg_make_buffer(&(sg_buffer_desc){
+                .usage = {.index_buffer = true},
+                .data = SG_RANGE(tidx)});
             tb_init = 1;
         }
         vs_params_t vs;
@@ -450,6 +454,7 @@ void efx_pipeline_play(void) {
         sg_apply_pipeline(P.mesh_pip[0]);
         sg_bindings bnd = {0};
         bnd.vertex_buffers[0] = tb;
+        bnd.index_buffer = tib;
         sg_apply_bindings(&bnd);
         sg_apply_uniforms(UB_vs_params,
                           &(sg_range){.ptr = &vs, .size = sizeof(vs)});
