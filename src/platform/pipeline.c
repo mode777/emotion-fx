@@ -389,7 +389,11 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
     }
 
     vs_params_t vs;
-    memcpy(vs.mvp, mvp, sizeof(mvp));
+    /* std140 vec4 rows = column-major columns of the clip matrix */
+    memcpy(vs.mvp0, mvp, 16);
+    memcpy(vs.mvp1, mvp + 4, 16);
+    memcpy(vs.mvp2, mvp + 8, 16);
+    memcpy(vs.mvp3, mvp + 12, 16);
     vs.tint[0] = mr->color[0];
     vs.tint[1] = mr->color[1];
     vs.tint[2] = mr->color[2];
@@ -445,8 +449,10 @@ void efx_pipeline_play(void) {
             tb_init = 1;
         }
         vs_params_t vs;
-        memcpy(vs.mvp, (const float[16]){1, 0, 0, 0, 0, 1, 0, 0,
-                                         0, 0, 1, 0, 0, 0, 0, 1}, 64);
+        memcpy(vs.mvp0, (const float[4]){1, 0, 0, 0}, 16);
+        memcpy(vs.mvp1, (const float[4]){0, 1, 0, 0}, 16);
+        memcpy(vs.mvp2, (const float[4]){0, 0, 1, 0}, 16);
+        memcpy(vs.mvp3, (const float[4]){0, 0, 0, 1}, 16);
         vs.tint[0] = 1;
         vs.tint[1] = 1;
         vs.tint[2] = 1;
