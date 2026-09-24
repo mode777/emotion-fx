@@ -57,6 +57,19 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   Windows and macOS are slower per-roundtrip and verified in that order.
   The full matrix still gates every milestone (ADR 0020) — the order is
   about how changes are iterated, not about which targets count.
+- **Verify on the SSH verification server BEFORE dispatching the gate.**
+  A Linux server with Xvfb + llvmpipe, pinned emsdk 3.1.64 and pinned
+  chrome-headless-shell 131 runs the exact two golden-bearing jobs the
+  gate runs on ubuntu-latest (native ctest incl. all golden scenes, and
+  the Emscripten golden suite). Flow: commit → push branch →
+  `python3 tools/verify_remote.py all <branch>` → only if green dispatch
+  `gh workflow run ci.yml --ref <branch>`. If the server verification
+  fails, fix and re-verify — do not start a GitHub Actions run yet.
+  This is a pre-filter for the Linux signal; the Linux→Windows→macOS
+  order and the four-target gate still apply as above. Credentials come
+  from the `SSH_HOST` / `SSH_USER` / `SSH_PASSWORD` env vars only — never
+  commit them or the server's identity. Details and quirks:
+  `docs/verification-server.md`.
 - **Agents may commit and push to run the gate.** Because CI never fires on
   an ordinary push (ADR 0023), an agent verifying a change MAY create a
   branch, commit, and push for the sole purpose of dispatching
