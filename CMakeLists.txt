@@ -85,6 +85,10 @@ if(EMSCRIPTEN)
     set(EFX_WEB_COMMON
         -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2MB
         -sEXPORTED_FUNCTIONS=_main,_malloc,_free
+        # the web bridge's JS (entry.js/boot_pre.js) uses the FS API at
+        # runtime for resource roots; keep it linked even when no C code
+        # touches files (nothing else forces FS inclusion on the node player)
+        -sFORCE_FILESYSTEM=1
         "--pre-js=${CMAKE_CURRENT_SOURCE_DIR}/src/web/boot_pre.js"
         "--post-js=${CMAKE_CURRENT_SOURCE_DIR}/src/web/entry.js")
 
