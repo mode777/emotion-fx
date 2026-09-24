@@ -115,7 +115,16 @@ jobs:
           which node; node --version
           ls -la tests/fixtures/root_ok || true
           node -e "const s=require('fs').statSync(process.cwd()+'/tests/fixtures/root_ok'); console.log('stat ok, isDir', s.isDirectory())"
-          node build-em/player.js tests/fixtures/root_ok; echo "player exit=$?"
+          node -e "
+            const cp = require('child_process');
+            const r = cp.spawnSync(process.execPath, ['build-em/player.js', 'tests/fixtures/root_ok'], {encoding: 'utf8'});
+            console.log('player status:', r.status);
+            const kept = (r.stderr || '').split('\n').filter((l) => l.length <= 500);
+            console.log('--- stderr (long lines dropped), first 40 lines ---');
+            console.log(kept.slice(0, 40).join('\n'));
+          "
+          echo '--- web_root_ok under node via ctest, alone ---'
+          ctest --test-dir build-em -R web_root_ok --output-on-failure 2>&1 | tail -15
 
       - name: Install Linux window dependencies (native comparison baseline)
         run: |
