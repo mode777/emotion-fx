@@ -9,6 +9,7 @@ replacing the snapshot and editing the table below.
 | `sokol/` | floooh/sokol | master @ `2e75443dbd4940b5aa8d76a8e479f8e4b270b9a3` | https://github.com/floooh/sokol (only `sokol_app.h`, `sokol_gfx.h`, `sokol_glue.h`) |
 | `quickjs-ng/` | quickjs-ng/quickjs | v0.17.0 (QJS 0.17.0) | https://github.com/quickjs-ng/quickjs, release tarball `v0.17.0.tar.gz` |
 | `stb/` | nothings/stb | master @ `2c980bb59875b0d32144a71867fbdebb2f77cd20` (`stb_image` v2.30, `stb_image_write` v1.16) | https://github.com/nothings/stb (only `stb_image.h`, `stb_image_write.h`) |
+| `glm/` | g-truc/glm | 1.0.3 @ `8d1fd52e5ab5590e2c81768ace50c72bae28f2ed` | https://github.com/g-truc/glm (core headers + `detail/` + `simd/` + `ext/` + `gtc/`; excludes `gtx/`, the C++20 module `glm.cppm`, `CMakeLists.txt`, umbrella `ext.hpp`) |
 | — (tool, not vendored) | floooh/sokol-tools-bin | master @ `11d0cf678105d614d675e6d9bd2aaf3eeff12f8c` (2026-08-29) | https://github.com/floooh/sokol-tools-bin (`bin/linux/sokol-shdc`) — generation-time tool for `shaders/quad.h`; never linked into the player |
 
 Notes:
@@ -22,9 +23,14 @@ Notes:
   tests/examples/CLI/install disabled). The engine does not compile
   quickjs-libc into the runtime — scripts get only the engine's `efx` API plus
   the ES6 standard library, keeping them free of host (browser/Node) APIs.
-- GLM is a recorded future dependency (math decision from F1); it is
-  deliberately NOT vendored yet — first use is F3 (see
-  `openspec/changes/f1-player-skeleton/design.md`, D6).
+- GLM (F3, ADR 0005): header-only C++; consumed only from C++-compiled
+  translation units (`src/math/`) that expose a plain C API — GLM types never
+  enter C11 translation units. The wrapper calls the convention-explicit
+  `glm::perspectiveRH_NO` / `glm::orthoRH_NO` / `glm::lookAtRH` (right-handed,
+  OpenGL depth range −1..+1); the `GLM_FORCE_*` defines are not used. The
+  projection conventions for D3D11/Metal (0..1 depth) are handled at playback
+  by the platform layer, not by flipping GLM conventions. Evaluation record:
+  `openspec/changes/f3-3d-core/proposal.md`.
 - sokol-shdc (ADR 0021) compiles `shaders/quad.glsl` into the committed
   `shaders/quad.h`. The tool is used at author time only; the player
   build never needs it (offline policy intact). Regeneration: download

@@ -3,6 +3,7 @@
 #include "runtime/runtime.h"
 #include "runtime/runtime_internal.h"
 #include "api/api.h"
+#include "prelude/prelude.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -163,6 +164,10 @@ efx_runtime *efx_runtime_new(char *const *args, int arg_count) {
         JS_CFUNC_DEF("drawQuad", 4, efx_js_drawQuad),
         JS_CFUNC_DEF("setBlendMode", 1, efx_js_setBlendMode),
         JS_CGETSET_DEF("whiteTexture", efx_js_whiteTexture, NULL),
+        JS_CFUNC_DEF("setCamera3D", 1, efx_js_setCamera3D),
+        JS_CFUNC_DEF("createMeshData", 1, efx_js_createMeshData),
+        JS_CFUNC_DEF("createMesh", 1, efx_js_createMesh),
+        JS_CFUNC_DEF("drawMesh", 1, efx_js_drawMesh),
     };
     JS_SetPropertyFunctionList(rt->ctx, efx, efx_funcs,
                                (int)(sizeof(efx_funcs) / sizeof(efx_funcs[0])));
@@ -173,6 +178,28 @@ efx_runtime *efx_runtime_new(char *const *args, int arg_count) {
         efx_runtime_destroy(rt);
         return NULL;
     }
+    /* engine-bundled pure-JS layer (F3 math + primitives); evaluated
+       against the efx namespace so both bindings share one source */
+    static const char wrapper[] =
+        "(function(efx){\n";
+    size_t wrap_len = sizeof(wrapper) - 1;
+    size_t total = wrap_len + (size_t)EFX_JS_PRELUDE_LEN + 16;
+    char *code = malloc(total);
+    if (!code) {
+        fprintf(stderr, "player: out of memory\n");
+        efx_runtime_destroy(rt);
+        return NULL;
+    }
+    memcpy(code, wrapper, wrap_len);
+    memcpy(code + wrap_len, EFX_JS_PRELUDE, (size_t)EFX_JS_PRELUDE_LEN);
+    memcpy(code + wrap_len + (size_t)EFX_JS_PRELUDE_LEN, "\n})(efx);\n", 11);
+    if (efx_runtime_eval_string(rt, "<prelude>", code) != 0) {
+        fprintf(stderr, "player: prelude evaluation failed\n");
+        free(code);
+        efx_runtime_destroy(rt);
+        return NULL;
+    }
+    free(code);
     return rt;
 }
 

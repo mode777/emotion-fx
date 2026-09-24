@@ -211,6 +211,131 @@ function __efxEnsureApi() {
         },
     });
 
+    function EfxMeshData(id) {
+        this.__id = id;
+        this.__alive = true;
+    }
+    EfxMeshData.prototype.destroy = function () {
+        if (!(this instanceof EfxMeshData)) {
+            throw new TypeError('not a resource object');
+        }
+        if (!this.__alive) {
+            return;
+        }
+        this.__alive = false;
+        bridge['_efx_bridge_meshdata_destroy'](this.__id);
+    };
+    Object.defineProperty(EfxMeshData.prototype, 'surfaceCount', {
+        get: function () {
+            if (!(this instanceof EfxMeshData)) {
+                throw new TypeError('expected a MeshData');
+            }
+            if (!this.__alive) {
+                throw new TypeError('using a destroyed resource');
+            }
+            return bridge['_efx_bridge_meshdata_surface_count'](this.__id);
+        },
+    });
+
+    function EfxMesh(handle) {
+        this.__handle = handle;
+        this.__alive = true;
+    }
+    EfxMesh.prototype.destroy = function () {
+        if (!(this instanceof EfxMesh)) {
+            throw new TypeError('not a resource object');
+        }
+        if (!this.__alive) {
+            return;
+        }
+        this.__alive = false;
+        bridge['_efx_bridge_mesh_destroy'](this.__handle);
+    };
+    Object.defineProperty(EfxMesh.prototype, 'surfaceCount', {
+        get: function () {
+            if (!(this instanceof EfxMesh)) {
+                throw new TypeError('expected a Mesh');
+            }
+            if (!this.__alive) {
+                throw new TypeError('using a destroyed resource');
+            }
+            return bridge['_efx_bridge_mesh_surface_count'](this.__handle);
+        },
+    });
+
+    function liveMeshData(v) {
+        if (!(v instanceof EfxMeshData)) {
+            throw new TypeError('expected a MeshData');
+        }
+        if (!v.__alive) {
+            throw new TypeError('using a destroyed resource');
+        }
+        return v;
+    }
+
+    function liveMesh(v) {
+        if (!(v instanceof EfxMesh)) {
+            throw new TypeError('expected a Mesh');
+        }
+        if (!v.__alive) {
+            throw new TypeError('using a destroyed resource');
+        }
+        return v;
+    }
+
+    /* flat number array (JS array or typed array) -> Float32Array copy;
+       element rules mirror the desktop binding: non-number TypeError,
+       non-finite RangeError */
+    function __efxFloat32Array(v, what) {
+        if (!Array.isArray(v) && !ArrayBuffer.isView(v)) {
+            throw new TypeError(what + ' must be an array');
+        }
+        var n = v.length;
+        var out = new Float32Array(n);
+        for (var i = 0; i < n; i++) {
+            var d = v[i];
+            if (typeof d !== 'number') {
+                throw new TypeError('array elements must be numbers');
+            }
+            if (!isFinite(d)) {
+                throw new RangeError('array elements must be finite numbers');
+            }
+            out[i] = d;
+        }
+        return out;
+    }
+
+    function __efxUint32Array(v) {
+        if (!Array.isArray(v) && !ArrayBuffer.isView(v)) {
+            throw new TypeError('indices must be an array');
+        }
+        var n = v.length;
+        var out = new Uint32Array(n);
+        for (var i = 0; i < n; i++) {
+            var d = v[i];
+            if (typeof d !== 'number') {
+                throw new TypeError('indices must be numbers');
+            }
+            if (!isFinite(d) || d < 0 || d > 4294967295 || d !== Math.floor(d)) {
+                throw new RangeError('indices must be integers in [0, 2^32-1]');
+            }
+            out[i] = d;
+        }
+        return out;
+    }
+
+    function mallocCopyF32(arr) {
+        var ptr = bridge['_malloc'](arr.length * 4);
+        HEAPF32.set(arr, ptr >> 2);
+        return ptr;
+    }
+
+    function mallocCopyU32(arr) {
+        var ptr = bridge['_malloc'](arr.length * 4);
+        HEAPU32.set(arr, ptr >> 2);
+        return ptr;
+    }
+
     function liveImageData(v) {
         if (!(v instanceof EfxImageData)) {
             throw new TypeError('expected an ImageData');
@@ -523,6 +648,220 @@ function __efxEnsureApi() {
             }
             bridge['_efx_bridge_set_blend'](m);
         },
+        setCamera3D: function (opts) {
+            if (arguments.length < 1 || !__efxIsObject(opts)) {
+                throw new TypeError('setCamera3D requires an options object');
+            }
+            var known = { pos: 1, target: 1, fov: 1, near: 1, far: 1 };
+            var names = Object.getOwnPropertyNames(opts);
+            for (var i = 0; i < names.length; i++) {
+                if (!known[names[i]]) {
+                    throw new TypeError("unknown setCamera3D option '" + names[i] + "'");
+                }
+            }
+            var pos = opts['pos'];
+            var target = opts['target'];
+            if (pos === undefined || target === undefined) {
+                throw new TypeError('setCamera3D requires pos and target');
+            }
+            var p = __efxFloat32Array(pos, 'pos');
+            var t = __efxFloat32Array(target, 'target');
+            if (p.length !== 3 || t.length !== 3) {
+                throw new RangeError('pos and target must hold 3 numbers');
+            }
+            var fov = opts['fov'];
+            if (fov === undefined) {
+                throw new TypeError('setCamera3D requires fov');
+            }
+            if (typeof fov !== 'number') {
+                throw new TypeError('fov must be a number');
+            }
+            if (!isFinite(fov)) {
+                throw new RangeError('fov must be finite');
+            }
+            var nearZ = 0.1, farZ = 100;
+            var nv = opts['near'];
+            if (nv !== undefined) {
+                if (typeof nv !== 'number') {
+                    throw new TypeError('near and far must be numbers');
+                }
+                if (!isFinite(nv)) {
+                    throw new RangeError('near and far must be finite');
+                }
+                nearZ = nv;
+            }
+            var fv = opts['far'];
+            if (fv !== undefined) {
+                if (typeof fv !== 'number') {
+                    throw new TypeError('near and far must be numbers');
+                }
+                if (!isFinite(fv)) {
+                    throw new RangeError('near and far must be finite');
+                }
+                farZ = fv;
+            }
+            bridge['_efx_bridge_set_camera3d'](p[0], p[1], p[2],
+                t[0], t[1], t[2], fov, nearZ, farZ);
+        },
+        createMeshData: function (opts) {
+            if (arguments.length < 1 || !__efxIsObject(opts)) {
+                throw new TypeError('createMeshData requires an options object');
+            }
+            var bagKnown = { surfaces: 1, positions: 1, normals: 1,
+                uvs: 1, colors: 1, indices: 1 };
+            var bagNames = Object.getOwnPropertyNames(opts);
+            for (var bi = 0; bi < bagNames.length; bi++) {
+                if (!bagKnown[bagNames[bi]]) {
+                    throw new TypeError("unknown createMeshData option '" + bagNames[bi] + "'");
+                }
+            }
+            var surfaces = opts['surfaces'];
+            var shorthand = opts['positions'] !== undefined;
+            if (surfaces !== undefined && shorthand) {
+                throw new TypeError('pass either surfaces or single-surface fields');
+            }
+            if (surfaces === undefined && !shorthand) {
+                throw new TypeError('createMeshData requires surfaces');
+            }
+            var list;
+            if (surfaces !== undefined) {
+                if (!Array.isArray(surfaces)) {
+                    throw new TypeError('surfaces must be an array');
+                }
+                if (surfaces.length < 1 || surfaces.length > 16) {
+                    throw new RangeError('surfaces must hold 1..16 entries');
+                }
+                list = surfaces;
+            } else {
+                list = [opts];
+            }
+            var surfKnown = { positions: 1, normals: 1, uvs: 1,
+                colors: 1, indices: 1 };
+            var id = bridge['_efx_bridge_meshdata_create'](list.length);
+            if (!id) {
+                throw new Error('out of memory');
+            }
+            for (var i = 0; i < list.length; i++) {
+                var sv = list[i];
+                var bad = null;
+                if (!__efxIsObject(sv)) {
+                    bridge['_efx_bridge_meshdata_destroy'](id);
+                    throw new TypeError('surfaces must be objects');
+                }
+                var names = Object.getOwnPropertyNames(sv);
+                for (var k = 0; k < names.length; k++) {
+                    if (!surfKnown[names[k]]) {
+                        bad = "unknown surface option '" + names[k] + "'";
+                    }
+                }
+                if (bad !== null) {
+                    bridge['_efx_bridge_meshdata_destroy'](id);
+                    throw new TypeError(bad);
+                }
+                if (sv['positions'] === undefined) {
+                    bridge['_efx_bridge_meshdata_destroy'](id);
+                    throw new TypeError('surface requires positions');
+                }
+                var pos = __efxFloat32Array(sv['positions'], 'positions');
+                var nrm = sv['normals'] !== undefined
+                    ? __efxFloat32Array(sv['normals'], 'normals') : new Float32Array(0);
+                var uvs = sv['uvs'] !== undefined
+                    ? __efxFloat32Array(sv['uvs'], 'uvs') : new Float32Array(0);
+                var cols = sv['colors'] !== undefined
+                    ? __efxFloat32Array(sv['colors'], 'colors') : new Float32Array(0);
+                var idx = sv['indices'] !== undefined
+                    ? __efxUint32Array(sv['indices']) : new Uint32Array(0);
+                var pPtr = mallocCopyF32(pos);
+                var nPtr = mallocCopyF32(nrm);
+                var uPtr = mallocCopyF32(uvs);
+                var cPtr = mallocCopyF32(cols);
+                var iPtr = mallocCopyU32(idx);
+                var rc = bridge['_efx_bridge_meshdata_surface'](id, i,
+                    pPtr, pos.length, nPtr, nrm.length, uPtr, uvs.length,
+                    cPtr, cols.length, iPtr, idx.length);
+                bridge['_efx_bridge_mem_free'](pPtr);
+                bridge['_efx_bridge_mem_free'](nPtr);
+                bridge['_efx_bridge_mem_free'](uPtr);
+                bridge['_efx_bridge_mem_free'](cPtr);
+                bridge['_efx_bridge_mem_free'](iPtr);
+                if (rc !== 0) {
+                    bridge['_efx_bridge_meshdata_destroy'](id);
+                    throw new RangeError('invalid mesh data');
+                }
+            }
+            rc = bridge['_efx_bridge_meshdata_commit'](id);
+            if (rc !== 0) {
+                bridge['_efx_bridge_meshdata_destroy'](id);
+                throw new RangeError('invalid mesh data');
+            }
+            return new EfxMeshData(id);
+        },
+        createMesh: function (meshData) {
+            if (arguments.length < 1) {
+                throw new TypeError('createMesh requires a MeshData');
+            }
+            var md = liveMeshData(meshData);
+            var handle = bridge['_efx_bridge_mesh_create'](md.__id);
+            if (!handle) {
+                throw new Error('mesh upload failed (no GPU context?)');
+            }
+            return new EfxMesh(handle);
+        },
+        drawMesh: function (opts) {
+            if (arguments.length < 1 || !__efxIsObject(opts)) {
+                throw new TypeError('drawMesh requires an options object');
+            }
+            var known = { mesh: 1, transform: 1, color: 1 };
+            var names = Object.getOwnPropertyNames(opts);
+            for (var i = 0; i < names.length; i++) {
+                if (!known[names[i]]) {
+                    throw new TypeError("unknown drawMesh option '" + names[i] + "'");
+                }
+            }
+            var mesh = opts['mesh'];
+            if (mesh === undefined) {
+                throw new TypeError('drawMesh requires a mesh');
+            }
+            var m = liveMesh(mesh);
+            var transform = null, color = null;
+            var tv = opts['transform'];
+            if (tv !== undefined) {
+                transform = __efxFloat32Array(tv, 'transform');
+                if (transform.length !== 16) {
+                    throw new RangeError('transform must hold 16 numbers');
+                }
+            }
+            var cv = opts['color'];
+            if (cv !== undefined) {
+                color = __efxFloat32Array(cv, 'color');
+                if (color.length !== 4) {
+                    throw new RangeError('color must hold 4 numbers');
+                }
+            }
+            var tPtr = 0, cPtr = 0;
+            if (transform !== null) {
+                tPtr = mallocCopyF32(transform);
+            }
+            if (color !== null) {
+                cPtr = mallocCopyF32(color);
+            }
+            var rc = bridge['_efx_bridge_draw_mesh'](m.__handle, tPtr, cPtr);
+            if (tPtr) {
+                bridge['_efx_bridge_mem_free'](tPtr);
+            }
+            if (cPtr) {
+                bridge['_efx_bridge_mem_free'](cPtr);
+            }
+            if (rc === 1) {
+                throw new RangeError('display list budget exceeded');
+            }
+            if (rc === 2) {
+                throw new TypeError('expected a live Mesh');
+            }
+            if (rc !== 0) {
+                throw new Error('drawMesh failed');
+            }
+        },
     };
 
     var whiteTex = null;
@@ -538,6 +877,11 @@ function __efxEnsureApi() {
             return whiteTex;
         },
     });
+
+    /* engine-bundled pure-JS layer (F3 math + primitives): the same
+       embedded source the desktop quickjs runtime evaluates (ADR 0022) */
+    var preludeSrc = UTF8ToString(bridge['_efx_bridge_js_prelude']());
+    new Function('efx', preludeSrc)(api);
 
     globalThis['efx'] = api;
     st.api = api;

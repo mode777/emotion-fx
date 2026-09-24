@@ -36,8 +36,11 @@ static int g_frame;
    framebuffer-only swapchain drawable */
 static sg_image g_cap_img;
 static sg_view g_cap_view;
+static sg_image g_cap_depth_img;
+static sg_view g_cap_depth_view;
 static sg_attachments g_cap_atts;
 static void *g_cap_mtl;
+static void *g_cap_depth_mtl;
 static int g_cap_active;
 #endif
 
@@ -48,6 +51,9 @@ static sg_pass_action efx_pass_action(void) {
     efx_render_clear_color(c);
     pa.colors[0].load_action = SG_LOADACTION_CLEAR;
     pa.colors[0].clear_value = (sg_color){c[0], c[1], c[2], c[3]};
+    /* F3 depth: cleared to far (1.0) each pass (design D4) */
+    pa.depth.load_action = SG_LOADACTION_CLEAR;
+    pa.depth.clear_value = 1.0f;
     return pa;
 }
 
@@ -80,8 +86,32 @@ static void efx_capture_setup(void) {
     g_cap_view = sg_make_view(&(sg_view_desc){
         .color_attachment.image = g_cap_img,
     });
+    /* depth attachment so golden captures depth-test like the window pass
+       (design D4) */
+    MTLTextureDescriptor *dd = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                                     width:EFX_CAP_W height:EFX_CAP_H
+                                 mipmapped:NO];
+    dd.usage = MTLTextureUsageRenderTarget;
+    dd.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> dtex = [mtl newTextureWithDescriptor:dd];
+    if (!dtex) {
+        return;
+    }
+    g_cap_depth_mtl = (__bridge_retained void *)dtex;
+    g_cap_depth_img = sg_make_image(&(sg_image_desc){
+        .width = EFX_CAP_W,
+        .height = EFX_CAP_H,
+        .pixel_format = SG_PIXELFORMAT_DEPTH,
+        .usage.depth_stencil_attachment = true,
+        .mtl_textures[0] = g_cap_depth_mtl,
+    });
+    g_cap_depth_view = sg_make_view(&(sg_view_desc){
+        .depth_stencil_attachment.image = g_cap_depth_img,
+    });
     memset(&g_cap_atts, 0, sizeof(g_cap_atts));
     g_cap_atts.colors[0] = g_cap_view;
+    g_cap_atts.depth_stencil = g_cap_depth_view;
     g_cap_active = 1;
 }
 #endif
@@ -227,7 +257,14 @@ void efx_platform_shutdown(void) {
     if (g_cap_active) {
         sg_destroy_view(g_cap_view);
         sg_destroy_image(g_cap_img);
+        sg_destroy_view(g_cap_depth_view);
+        sg_destroy_image(g_cap_depth_img);
         g_cap_active = 0;
+    }
+    if (g_cap_depth_mtl) {
+        id<MTLTexture> dtex = (__bridge id<MTLTexture>)g_cap_depth_mtl;
+        [dtex release];
+        g_cap_depth_mtl = NULL;
     }
 #endif
     sg_shutdown();
