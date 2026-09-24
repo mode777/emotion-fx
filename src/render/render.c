@@ -508,6 +508,10 @@ void efx_meshdata_destroy(efx_meshdata *md) {
 /* build the interleaved GPU layout (design D1) into a pending block; the
  * block layout is count · [vcount, icount, interleaved..., indices...] */
 static int pending_build(mesh_pending *p, const efx_meshdata *md) {
+    if (!md || md->surface_count < 1 ||
+        md->surface_count > EFX_MESH_MAX_SURFACES) {
+        return EFX_RENDER_ERR_NOMEM;
+    }
     size_t floats = 0, indices = 0;
     for (int i = 0; i < md->surface_count; i++) {
         const efx_surface *s = &md->surfaces[i];
