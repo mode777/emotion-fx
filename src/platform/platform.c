@@ -52,7 +52,7 @@ static void efx_sokol_log(const char *tag, uint32_t level,
                           void *ud) {
     (void)item_id;
     (void)ud;
-    if (level <= 1) { /* panic + error */
+    if (level <= 2) { /* panic + error + warning */
         fprintf(stderr, "sokol[%s] %s:%u: %s\n", tag,
                 filename ? filename : "?", line_nr,
                 message ? message : "<no message>");

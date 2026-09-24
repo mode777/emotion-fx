@@ -36,6 +36,8 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then PLAYER=build/Release/player.exe; else PLAYER=build/player; fi
           mkdir -p diag
           for combo in "0_1_0_0_0_0" "0_1_0_0_1_0" "0_1_0_0_0_1" "1_1_0_0_1_0" "0_1_1_0_0_1" "0_0_0_1_0_0" "0_1_0_1_1_0"; do
+            # hardcube run first (bypasses everything but the pipeline)
+            EFX_DIAG_HARDCUBE=1 "$PLAYER" --capture-frame 2 --capture-output "diag/hardcube.png" tests/goldens/cube3d || echo "hardcube capture failed"
             IFS=_ read nocull noremap nodepth noib posonly u16 <<< "$combo"
             tag="cul${nocull}_rem${noremap}_dep${nodepth}_ib${noib}_po${posonly}_u16${u16}"
             export EFX_DIAG_NOCULL=$nocull EFX_DIAG_NOREMAP=$noremap EFX_DIAG_NODEPTH=$nodepth EFX_DIAG_NOIB=$noib EFX_DIAG_POSONLY=$posonly EFX_DIAG_U16=$u16
