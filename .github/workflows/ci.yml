@@ -108,6 +108,15 @@ jobs:
       - name: Smoke tests (headless under Node, native bridge)
         run: ctest --test-dir build-em --output-on-failure
 
+      # TEMPORARY diagnostic for web smoke failure — remove once resolved
+      - name: Debug web smoke environment
+        if: always()
+        run: |
+          which node; node --version
+          ls -la tests/fixtures/root_ok || true
+          node -e "const s=require('fs').statSync(process.cwd()+'/tests/fixtures/root_ok'); console.log('stat ok, isDir', s.isDirectory())"
+          node build-em/player.js tests/fixtures/root_ok; echo "player exit=$?"
+
       - name: Install Linux window dependencies (native comparison baseline)
         run: |
           sudo apt-get update
