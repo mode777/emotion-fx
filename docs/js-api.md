@@ -29,7 +29,7 @@ milestone ladder.
 
   ```js
   // F2 · C · current
-  efx.drawQuad(x, y, w, h, texture, opts?)
+  efx.drawQuad(x, y, texture, opts?)
   ```
 
   Entries without a `provisional` marker describe current, shipped behavior.
@@ -51,11 +51,12 @@ Every rule below traces to vision.md or to F1's implemented behavior.
   `load*`/`create*` fetch or upload resources and return resource objects.
 - **Resources**: loaders and creators return opaque resource objects (the
   resource taxonomy — see [Resource & memory
-  model](#resource--memory-model)); they are fully opaque for now —
-  `res.destroy()` releases deterministically, GC is the backstop, and
-  methods/getters/setters are reserved for later.
+  model](#resource--memory-model)); `res.destroy()` releases
+  deterministically and GC is the backstop. Native-backed classes are
+  otherwise fully opaque except for documented read-only query properties —
+  the first are Texture's `width`/`height`.
 - **Parameters**: hot immediate-mode calls take scalar arguments first
-  (`drawQuad(x, y, w, h, texture, opts?)`); configuration beyond ~3 values
+  (`drawQuad(x, y, texture, opts?)`); configuration beyond ~3 values
   goes in a trailing option object. Optionality is explicit at two levels:
   - a `?` on the bag itself (`opts?`) means the whole object may be
     omitted — every field then takes its documented default;
@@ -131,7 +132,7 @@ payload + `skinned` flag: ADR 0017, all under `docs/decisions/`).
 | Class | Meaning | Release path |
 |---|---|---|
 | **JS-managed** | Plain data objects; garbage collected | Drop the reference |
-| **Native-backed class** | Opaque object wrapping a native handle — fully opaque for now (`destroy()` only); GC finalizer backstop | `res.destroy()` (primary), GC / shutdown (backstop) |
+| **Native-backed class** | Opaque object wrapping a native handle — read-only query properties only where documented (Texture: `width`/`height`; all others: none); GC finalizer backstop | `res.destroy()` (primary), GC / shutdown (backstop) |
 | **Slot-based** | Fixed pre-allocated bank of indexed resources | Overwrite the slot |
 
 | Resource | Contents | Class | Side | Delivered | Notes |
@@ -139,7 +140,7 @@ payload + `skinned` flag: ADR 0017, all under `docs/decisions/`).
 | MeshData | Attributes + indices; skinned meshes add `joints`/`weights` vertex attributes (glTF-style) | Native class | CPU | F3 | `createMeshData` / `loadMeshData` (F6) |
 | ImageData | Raw pixels + size + format | Native class | CPU | F2 | `createImageData` / `loadImage` (F6) |
 | Mesh | GPU mesh; skinned meshes carry skin, skeleton, and clips internally (ADR 0017) | Native class | GPU | F3 | `createMesh(meshData)` / `loadMesh`; `mesh.destroy()` |
-| Texture | GPU texture | Native class | GPU | F2 | `createTexture(imageData)`; `tex.destroy()`; `efx.whiteTexture` is an engine-owned instance (destroy throws) |
+| Texture | GPU texture | Native class | GPU | F2 | `createTexture(imageData)`; `tex.destroy()`; read-only `tex.width` / `tex.height` (texture pixels; throw `TypeError` when destroyed); `efx.whiteTexture` is an engine-owned instance (destroy throws) |
 | RenderTarget | GPU render target | Native class | GPU | F5 | `createRenderTarget`; `rt.destroy()` |
 | Materials (Phong parameter objects) | — | JS-managed | — | F4 | Passed to `efx.setMaterial` |
 | Fonts (atlas + quad layout) | — | JS-managed | — | F8 | Pure JS over Texture; passed to `drawText` |
@@ -265,7 +266,7 @@ efx.setClearColor(color)          // [r,g,b,a]; frame clear color (default black
 efx.setCamera2D(opts)             // { frame?, x?, y?, zoom?, rotation? }
 efx.createImageData(opts)         // → ImageData; { width, height, pixels, format? = 'rgba8' }
 efx.createTexture(imageData)      // → Texture; uploads CPU → GPU
-efx.drawQuad(x, y, w, h, texture, opts?)  // required texture; opts below
+efx.drawQuad(x, y, texture, opts?)  // required texture; opts below
 efx.setBlendMode(mode)            // 'alpha' (default) | 'additive' | 'subtractive'
 efx.whiteTexture                  // engine-owned 1×1 white Texture (read-only)
 ```
@@ -288,21 +289,28 @@ rotation })`:
 - Camera state applies to draws recorded **after** the call; recorded
   draws never observe later changes (same for blend mode — ADR 0019).
 
-**`drawQuad(x, y, w, h, texture, opts?)`** — records one quad:
+**`drawQuad(x, y, texture, opts?)`** — records one quad:
 
-- `x`, `y` place the quad's **top-left corner** in frame pixels; `w`, `h`
-  size it in frame pixels (both > 0).
+- `x`, `y` place the quad's **top-left corner** in frame pixels.
 - `texture` is **required** — a live Texture. Solid-color rectangles use
   `efx.whiteTexture` with a tint; `efx.whiteTexture` is engine-owned,
   `destroy()` on it throws `TypeError`.
+- **Size derivation** — the quad's size in frame pixels is the first of:
+  `opts.size` (`[width, height]`, both finite and > 0), else the drawn
+  `sourceRect` region's extent, else the texture's pixel size (1:1 sprite).
+  `opts.scale` applies **after** the size is determined — size is pre-scale.
+  A size entry ≤ 0, or a zero-extent `sourceRect`, throws `RangeError`.
 - `opts.color` — tint `[r,g,b,a]`, default opaque white.
-- `opts.rotation` — degrees clockwise, default 0; **pivots on the quad
-  center**.
-- `opts.scale` — uniform factor, default 1 (> 0); pivots on the quad
-  center.
+- `opts.rotation` — degrees clockwise, default 0.
+- `opts.scale` — uniform factor, default 1 (> 0).
 - `opts.sourceRect` — `{ x, y, w, h }` region of the texture in **texture
   pixels**; default: the full texture. Out-of-bounds rects throw
   `RangeError`.
+- `opts.origin` — `[px, py]` in quad-local frame pixels (relative to the
+  quad's top-left): the **pivot point** for rotation and scale. Default is
+  the determined size's center. The origin offset itself is never rotated or
+  scaled; an unrotated, unscaled quad always places its top-left at
+  `(x, y)` regardless of `origin`.
 - Unknown option fields throw `TypeError` (typo protection).
 
 **Resources** — `createImageData({ width, height, pixels, format? })`
@@ -310,7 +318,10 @@ builds CPU pixels: `pixels` is a flat array or typed array of RGBA8 bytes,
 length exactly `width × height × 4` (else `RangeError`); `format` is
 `'rgba8'` (the only format in F2). `createTexture(imageData)` uploads to a
 GPU Texture — both are opaque native-backed classes: `destroy()` releases
-deterministically, is idempotent, and using a destroyed resource throws.
+deterministically, is idempotent, and using a destroyed resource throws. A
+live Texture also exposes read-only `width` / `height` (its pixel size —
+the same values `drawQuad` derives from); reading either on a destroyed
+texture throws `TypeError`.
 
 **Display list** — draw calls record into a per-frame list played back
 after the render hook returns; there is no flush and no script-visible
@@ -327,9 +338,9 @@ efx.setCamera2D({ frame: [640, 480] }); // virtual 640×480 frame, view centered
 
 function render() { // global hook (or efx.registerRenderHook(fn))
     efx.setBlendMode('alpha');
-    efx.drawQuad(64, 64, 128, 128, logo); // textured sprite
+    efx.drawQuad(64, 64, logo, { size: [128, 128] }); // textured sprite, stretched 2x
     efx.setBlendMode('additive');
-    efx.drawQuad(224, 96, 64, 64, efx.whiteTexture, { color: [1, 0.5, 0, 1] });
+    efx.drawQuad(224, 96, efx.whiteTexture, { size: [64, 64], color: [1, 0.5, 0, 1] });
     efx.setBlendMode('alpha');
 }
 ```
@@ -466,7 +477,7 @@ const scene = efx.createRenderTarget({ width: 512, height: 512 });
 
 efx.registerRenderHook(() => {
     efx.beginRenderTarget(scene);
-    efx.drawQuad(96, 96, 320, 320, efx.whiteTexture, { color: [1, 0.4, 0.1, 1] });
+    efx.drawQuad(96, 96, efx.whiteTexture, { size: [320, 320], color: [1, 0.4, 0.1, 1] });
     efx.endRenderTarget();
 
     efx.drawRenderTarget(scene, 256, 144, 512, 512);

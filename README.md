@@ -8,10 +8,11 @@ scripted in ES6. See `vision.md` for the product vision and
 ## What F2 delivers (on top of F1)
 
 - The **2D drawing layer**: a virtual-pixel projection frame
-  (`efx.setCamera2D`), `efx.drawQuad` with tint / rotation / scale /
-  pixel-space `sourceRect`, CPU→GPU textures (`createImageData`,
-  `createTexture`), blending modes (`alpha`, `additive`, `subtractive`), and
-  the engine-owned `efx.whiteTexture` for solid rects.
+  (`efx.setCamera2D`), `efx.drawQuad` with derived size (`size` /
+  `sourceRect` / texture pixels), tint / rotation / scale / `origin` pivot,
+  CPU→GPU textures (`createImageData`, `createTexture` — textures expose
+  read-only `width`/`height`), blending modes (`alpha`, `additive`,
+  `subtractive`), and the engine-owned `efx.whiteTexture` for solid rects.
 - The **re-orderable display list** between the immediate-mode API and sokol
   (ADR 0019), unit-tested headlessly (record → assert, no GPU).
 - The **golden-image verification harness** (ADR 0020): capture run mode

@@ -103,7 +103,8 @@ foreach(CASE
 endforeach()
 if(NOT EMSCRIPTEN)
 foreach(CASE
-    white quad_record camera_snapshot src_oob budget texture_lifecycle
+    white quad_record size_derivation origin_pivot quad_validation
+    texture_size_getters camera_snapshot src_oob budget texture_lifecycle
     blend_snapshot default_camera hooks_registration)
     add_unit_test(efx_api_tests ${CASE})
 endforeach()
@@ -127,7 +128,7 @@ if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN)
 
     # a scene's test activates once its golden image is committed (the
     # golden bootstrap produces them via the manual workflow job)
-    foreach(SCENE clear solid srcrect pivot blend camera)
+    foreach(SCENE clear solid srcrect pivot blend camera origin)
         if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/goldens/${SCENE}/golden.png)
             add_test(NAME golden_${SCENE}
                 COMMAND ${CMAKE_COMMAND}

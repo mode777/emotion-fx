@@ -21,7 +21,8 @@ const scenes = [
             efx.setCamera2D({ frame: FRAME });
         },
         render() {
-            efx.drawQuad(220, 150, 200, 180, efx.whiteTexture, {
+            efx.drawQuad(220, 150, efx.whiteTexture, {
+                size: [200, 180],
                 color: [0.9, 0.2, 0.1, 1],
                 rotation: 30,
                 scale: 1.2,
@@ -44,11 +45,13 @@ const scenes = [
                 efx.createImageData({ width: 4, height: 4, pixels: pixels }));
         },
         render() {
-            efx.drawQuad(60, 60, 160, 160, this.tex);
-            efx.drawQuad(280, 60, 160, 160, this.tex, {
+            efx.drawQuad(60, 60, this.tex, { size: [160, 160] });
+            efx.drawQuad(280, 60, this.tex, {
+                size: [160, 160],
                 sourceRect: { x: 0, y: 0, w: 2, h: 4 },
             });
-            efx.drawQuad(500, 60, 80, 160, this.tex, {
+            efx.drawQuad(500, 60, this.tex, {
+                size: [80, 160],
                 sourceRect: { x: 0, y: 0, w: 1, h: 1 },
             });
         },
@@ -60,10 +63,12 @@ const scenes = [
             efx.setCamera2D({ frame: FRAME });
         },
         render() {
-            efx.drawQuad(270, 230, 100, 20, efx.whiteTexture, {
+            efx.drawQuad(270, 230, efx.whiteTexture, {
+                size: [100, 20],
                 color: [1, 1, 1, 1], rotation: 45, scale: 2.5,
             });
-            efx.drawQuad(310, 190, 20, 100, efx.whiteTexture, {
+            efx.drawQuad(310, 190, efx.whiteTexture, {
+                size: [20, 100],
                 color: [1, 0.7, 0.1, 1], rotation: 45, scale: 2.5,
             });
         },
@@ -81,11 +86,11 @@ const scenes = [
         },
         render() {
             efx.setBlendMode('additive');
-            efx.drawQuad(140, 140, 200, 200, this.tex, { color: [0.15, 0.35, 0.15, 1] });
+            efx.drawQuad(140, 140, this.tex, { size: [200, 200], color: [0.15, 0.35, 0.15, 1] });
             efx.setBlendMode('alpha');
-            efx.drawQuad(260, 180, 200, 200, this.tex, { color: [1, 1, 1, 0.5] });
+            efx.drawQuad(260, 180, this.tex, { size: [200, 200], color: [1, 1, 1, 0.5] });
             efx.setBlendMode('subtractive');
-            efx.drawQuad(340, 220, 180, 180, this.tex, { color: [0.4, 0.1, 0.4, 1] });
+            efx.drawQuad(340, 220, this.tex, { size: [180, 180], color: [0.4, 0.1, 0.4, 1] });
             efx.setBlendMode('alpha');
         },
     },
@@ -98,7 +103,8 @@ const scenes = [
         render() {
             for (let gy = 0; gy < 3; gy++) {
                 for (let gx = 0; gx < 3; gx++) {
-                    efx.drawQuad(200 + gx * 100, 140 + gy * 80, 60, 40, efx.whiteTexture, {
+                    efx.drawQuad(200 + gx * 100, 140 + gy * 80, efx.whiteTexture, {
+                        size: [60, 40],
                         color: [0.2 + gx * 0.25, 0.3 + gy * 0.2, 0.8 - gx * 0.2, 1],
                     });
                 }
@@ -132,9 +138,9 @@ function update() {
 function render() {
     scenes[scene].render();
     efx.setBlendMode('alpha');
-    efx.drawQuad(16, 456, 608, 8, efx.whiteTexture, { color: [1, 1, 1, 0.15] });
+    efx.drawQuad(16, 456, efx.whiteTexture, { size: [608, 8], color: [1, 1, 1, 0.15] });
     const progress = frameInScene / FRAMES_PER_SCENE;
     if (progress > 0) {
-        efx.drawQuad(16, 456, 608 * progress, 8, efx.whiteTexture, { color: [0.3, 0.8, 1, 1] });
+        efx.drawQuad(16, 456, efx.whiteTexture, { size: [608 * progress, 8], color: [0.3, 0.8, 1, 1] });
     }
 }

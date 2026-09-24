@@ -160,7 +160,7 @@ efx_runtime *efx_runtime_new(char *const *args, int arg_count) {
         JS_CFUNC_DEF("setCamera2D", 1, efx_js_setCamera2D),
         JS_CFUNC_DEF("createImageData", 1, efx_js_createImageData),
         JS_CFUNC_DEF("createTexture", 1, efx_js_createTexture),
-        JS_CFUNC_DEF("drawQuad", 6, efx_js_drawQuad),
+        JS_CFUNC_DEF("drawQuad", 4, efx_js_drawQuad),
         JS_CFUNC_DEF("setBlendMode", 1, efx_js_setBlendMode),
         JS_CGETSET_DEF("whiteTexture", efx_js_whiteTexture, NULL),
     };

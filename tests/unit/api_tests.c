@@ -97,8 +97,9 @@ static int white(void) {
 static int quad_record(void) {
     const char *code =
         "efx.setCamera2D({ frame: [640, 480], x: 320, y: 240, zoom: 2, rotation: 0 });"
-        "efx.drawQuad(0, 0, 64, 32, efx.whiteTexture,"
-        "  { rotation: 90, scale: 1.5, color: [1, 0, 0, 1], sourceRect: { x: 0, y: 0, w: 1, h: 1 } });";
+        "efx.drawQuad(0, 0, efx.whiteTexture,"
+        "  { rotation: 90, scale: 1.5, color: [1, 0, 0, 1], size: [64, 32],"
+        "    sourceRect: { x: 0, y: 0, w: 1, h: 1 } });";
     if (ok_js(code)) {
         end_js();
         return fail("snippet");
@@ -109,7 +110,7 @@ static int quad_record(void) {
     }
     efx_camera2d cam = {640, 480, 320, 240, 2, 0};
     efx_affine expect = efx_affine_mul(efx_camera_matrix(&cam, 640, 480),
-                                       efx_quad_matrix(0, 0, 64, 32, 90, 1.5f));
+                                       efx_quad_matrix(0, 0, 32, 16, 90, 1.5f));
     const efx_quad_record *r = efx_render_records(NULL);
     if (!feq(r[0].m.a, expect.a) || !feq(r[0].m.tx, expect.tx) ||
         !feq(r[0].m.ty, expect.ty)) {
@@ -119,6 +120,10 @@ static int quad_record(void) {
     if (!feq(r[0].tw, 1) || !feq(r[0].sw, 1)) {
         end_js();
         return fail("source rect/texture size");
+    }
+    if (!feq(r[0].w, 64) || !feq(r[0].h, 32)) {
+        end_js();
+        return fail("explicit size overrides derivation");
     }
     if (!feq(r[0].color[0], 1) || !feq(r[0].color[1], 0) || !feq(r[0].color[3], 1)) {
         end_js();
@@ -132,13 +137,143 @@ static int quad_record(void) {
     return 0;
 }
 
+/* size derivation: explicit size -> sourceRect extent -> texture pixels;
+ * scale applies after the size is determined */
+static int size_derivation(void) {
+    const char *code =
+        "const img = efx.createImageData({ width: 64, height: 32, pixels: new Uint8Array(64 * 32 * 4) });"
+        "const tex = efx.createTexture(img);"
+        "efx.drawQuad(0, 0, tex);"                                                    /* texture pixels */
+        "efx.drawQuad(0, 0, tex, { sourceRect: { x: 0, y: 0, w: 8, h: 4 } });"        /* src extent */
+        "efx.drawQuad(0, 0, tex, { sourceRect: { x: 0, y: 0, w: 8, h: 4 }, size: [50, 20] });"
+        "efx.drawQuad(0, 0, tex, { size: [32, 16], scale: 2 });";                     /* scale after size */
+    if (ok_js(code)) {
+        end_js();
+        return fail("snippet");
+    }
+    const efx_quad_record *r = efx_render_records(NULL);
+    if (rec_count() != 4) {
+        end_js();
+        return fail("record count");
+    }
+    if (!feq(r[0].w, 64) || !feq(r[0].h, 32)) {
+        end_js();
+        return fail("derive from texture pixels");
+    }
+    if (!feq(r[1].w, 8) || !feq(r[1].h, 4)) {
+        end_js();
+        return fail("derive from sourceRect");
+    }
+    if (!feq(r[2].w, 50) || !feq(r[2].h, 20)) {
+        end_js();
+        return fail("explicit size overrides sourceRect");
+    }
+    /* scale 2 around the (default center) pivot: matrix a-component = 2 */
+    if (!feq(r[3].w, 32) || !feq(r[3].h, 16) || !feq(r[3].m.a, 2)) {
+        end_js();
+        return fail("scale applies after size");
+    }
+    end_js();
+    return 0;
+}
+
+/* origin: pivot point in quad-local pixels; placement unchanged without
+ * rotation/scale; rotation around origin [0,0] fixes the top-left corner */
+static int origin_pivot(void) {
+    const char *code =
+        "const img = efx.createImageData({ width: 64, height: 32, pixels: new Uint8Array(64 * 32 * 4) });"
+        "const tex = efx.createTexture(img);"
+        "efx.drawQuad(10, 20, tex);"
+        "efx.drawQuad(10, 20, tex, { origin: [50, 100] });"              /* no transform: same */
+        "efx.drawQuad(10, 20, tex, { origin: [0, 0], rotation: 90 });";  /* pivot at top-left */
+    if (ok_js(code)) {
+        end_js();
+        return fail("snippet");
+    }
+    const efx_quad_record *r = efx_render_records(NULL);
+    if (rec_count() != 3) {
+        end_js();
+        return fail("record count");
+    }
+    /* untransformed: origin must not move the quad */
+    if (!feq(r[0].m.tx, r[1].m.tx) || !feq(r[0].m.ty, r[1].m.ty) ||
+        !feq(r[0].m.a, r[1].m.a)) {
+        end_js();
+        return fail("origin must not move an untransformed quad");
+    }
+    /* origin [0,0] + rotation 90 (y-down, clockwise): local (0,0) maps to
+     * (10, 20) and local (64, 0) maps to (10, 20 + 64) */
+    if (!feq(r[2].m.a + r[2].m.c * 0 + r[2].m.tx, 10) ||
+        !feq(r[2].m.b * 0 + r[2].m.d * 0 + r[2].m.ty, 20)) {
+        end_js();
+        return fail("origin pivot corner position");
+    }
+    if (!feq(r[2].m.a * 64 + r[2].m.tx, 10) || !feq(r[2].m.b * 64 + r[2].m.ty, 84)) {
+        end_js();
+        return fail("origin pivot rotation direction");
+    }
+    end_js();
+    return 0;
+}
+
+/* validation matrix for size/origin/zero-extent sourceRect */
+static int quad_validation(void) {
+    const char *code =
+        "function t(fn, kind) {"
+        "  try { fn(); throw new Error('did not throw'); }"
+        "  catch (e) {"
+        "    if (e instanceof Error && !(e instanceof TypeError) && !(e instanceof RangeError)) throw e;"
+        "    if (!(e instanceof kind)) throw new Error('wrong kind: ' + e);"
+        "  }"
+        "}"
+        "t(() => efx.drawQuad(0, 0, efx.whiteTexture, { size: [0, 10] }), RangeError);"
+        "t(() => efx.drawQuad(0, 0, efx.whiteTexture, { size: [10] }), RangeError);"
+        "t(() => efx.drawQuad(0, 0, efx.whiteTexture, { size: 'big' }), TypeError);"
+        "t(() => efx.drawQuad(0, 0, efx.whiteTexture, { origin: [NaN, 0] }), RangeError);"
+        "t(() => efx.drawQuad(0, 0, efx.whiteTexture, { origin: 'center' }), TypeError);"
+        "t(() => efx.drawQuad(0, 0, efx.whiteTexture,"
+        "  { sourceRect: { x: 0, y: 0, w: 0, h: 1 } }), RangeError);"
+        "t(() => efx.drawQuad(0, 0, efx.whiteTexture, { size: [4, 4], frobnicate: 1 }), TypeError);";
+    if (ok_js(code)) {
+        end_js();
+        return fail("quad validation matrix");
+    }
+    if (rec_count() != 0) {
+        end_js();
+        return fail("failed calls must record nothing");
+    }
+    end_js();
+    return 0;
+}
+
+/* Texture width/height getters: values, whiteTexture, destroyed throws */
+static int texture_size_getters(void) {
+    const char *code =
+        "const img = efx.createImageData({ width: 64, height: 32, pixels: new Uint8Array(64 * 32 * 4) });"
+        "const tex = efx.createTexture(img);"
+        "if (tex.width !== 64 || tex.height !== 32) throw new Error('texture size');"
+        "if (efx.whiteTexture.width !== 1 || efx.whiteTexture.height !== 1)"
+        "  throw new Error('white texture size');"
+        "tex.destroy();"
+        "try { tex.width; throw new Error('no'); }"
+        "catch (e) { if (!(e instanceof TypeError)) throw e; }"
+        "try { efx.drawQuad(0, 0, tex); throw new Error('no'); }"
+        "catch (e) { if (!(e instanceof TypeError)) throw e; }";
+    if (ok_js(code)) {
+        end_js();
+        return fail("texture size getters");
+    }
+    end_js();
+    return 0;
+}
+
 /* camera is snapshotted per record */
 static int camera_snapshot(void) {
     const char *code =
         "efx.setCamera2D({ frame: [640, 480] });"
-        "efx.drawQuad(100, 0, 8, 8, efx.whiteTexture);"
+        "efx.drawQuad(100, 0, efx.whiteTexture, { size: [8, 8] });"
         "efx.setCamera2D({ frame: [640, 480], x: 370, y: 0 });"
-        "efx.drawQuad(100, 0, 8, 8, efx.whiteTexture);";
+        "efx.drawQuad(100, 0, efx.whiteTexture, { size: [8, 8] });";
     if (ok_js(code)) {
         end_js();
         return fail("snippet");
@@ -160,7 +295,7 @@ static int camera_snapshot(void) {
 
 /* out-of-bounds sourceRect throws RangeError */
 static int src_oob(void) {
-    if (err_js("efx.drawQuad(0, 0, 8, 8, efx.whiteTexture,"
+    if (err_js("efx.drawQuad(0, 0, efx.whiteTexture,"
                "  { sourceRect: { x: 0, y: 0, w: 5, h: 5 } });", "oob sourceRect")) {
         end_js();
         return fail("oob sourceRect must throw");
@@ -173,7 +308,7 @@ static int src_oob(void) {
 static int budget(void) {
     const char *code =
         "try {"
-        "  for (let i = 0; i < 500000; i++) efx.drawQuad(0, 0, 1, 1, efx.whiteTexture);"
+        "  for (let i = 0; i < 500000; i++) efx.drawQuad(0, 0, efx.whiteTexture);"
         "  throw new Error('budget not enforced');"
         "} catch (e) { if (!(e instanceof RangeError)) throw e; }";
     if (ok_js(code)) {
@@ -191,7 +326,7 @@ static int texture_lifecycle(void) {
         "const tex = efx.createTexture(img);"
         "tex.destroy();"
         "tex.destroy();" /* idempotent */
-        "try { efx.drawQuad(0, 0, 4, 4, tex); throw new Error('no'); }"
+        "try { efx.drawQuad(0, 0, tex); throw new Error('no'); }"
         "catch (e) { if (!(e instanceof TypeError)) throw e; }";
     if (ok_js(code)) {
         end_js();
@@ -204,9 +339,9 @@ static int texture_lifecycle(void) {
 /* blend snapshot at the JS level */
 static int blend_snapshot(void) {
     const char *code =
-        "efx.drawQuad(0, 0, 4, 4, efx.whiteTexture);"
+        "efx.drawQuad(0, 0, efx.whiteTexture, { size: [4, 4] });"
         "efx.setBlendMode('subtractive');"
-        "efx.drawQuad(0, 0, 4, 4, efx.whiteTexture);";
+        "efx.drawQuad(0, 0, efx.whiteTexture, { size: [4, 4] });";
     if (ok_js(code)) {
         end_js();
         return fail("snippet");
@@ -238,7 +373,7 @@ static int clear_color_js(void) {
 
 /* default camera: frame == viewport, identity view */
 static int default_camera(void) {
-    if (ok_js("efx.drawQuad(0, 0, 4, 4, efx.whiteTexture);")) {
+    if (ok_js("efx.drawQuad(0, 0, efx.whiteTexture, { size: [4, 4] });")) {
         end_js();
         return fail("snippet");
     }
@@ -313,6 +448,10 @@ int main(int argc, char **argv) {
     const char *c = argv[1];
     if (!strcmp(c, "white")) return white();
     if (!strcmp(c, "quad_record")) return quad_record();
+    if (!strcmp(c, "size_derivation")) return size_derivation();
+    if (!strcmp(c, "origin_pivot")) return origin_pivot();
+    if (!strcmp(c, "quad_validation")) return quad_validation();
+    if (!strcmp(c, "texture_size_getters")) return texture_size_getters();
     if (!strcmp(c, "camera_snapshot")) return camera_snapshot();
     if (!strcmp(c, "src_oob")) return src_oob();
     if (!strcmp(c, "budget")) return budget();

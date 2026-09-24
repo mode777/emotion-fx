@@ -327,8 +327,10 @@ efx_affine efx_camera_matrix(const efx_camera2d *cam, float fw, float fh) {
 }
 
 /* local -> world; corner-anchored placement, rotation/scale pivot on the
- * quad center */
-efx_affine efx_quad_matrix(float x, float y, float w, float h,
+ * caller-provided point (quad-local, relative to the quad top-left; the
+ * legacy center pivot is origin = size/2) */
+efx_affine efx_quad_matrix(float x, float y,
+                           float origin_x, float origin_y,
                            float rotation_deg, float scale) {
     float t = rotation_deg * DEG2RAD;
     float cs = cosf(t) * scale;
@@ -338,12 +340,10 @@ efx_affine efx_quad_matrix(float x, float y, float w, float h,
     m.b = sn;
     m.c = -sn;
     m.d = cs;
-    float px = x + w * 0.5f;
-    float py = y + h * 0.5f;
-    float plx = w * 0.5f;
-    float ply = h * 0.5f;
-    m.tx = px - (m.a * plx + m.c * ply);
-    m.ty = py - (m.b * plx + m.d * ply);
+    float px = x + origin_x;
+    float py = y + origin_y;
+    m.tx = px - (m.a * origin_x + m.c * origin_y);
+    m.ty = py - (m.b * origin_x + m.d * origin_y);
     return m;
 }
 
@@ -370,7 +370,8 @@ static int record_push(efx_quad_record rec) {
 
 int efx_render_quad(float x, float y, float w, float h, uint64_t texture,
                     const float color[4], float rotation_deg, float scale,
-                    const float src_rect[4], int has_src) {
+                    const float src_rect[4], int has_src,
+                    float origin_x, float origin_y) {
     ensure_state();
     float fw = R.camera.frame_w > 0.0f ? R.camera.frame_w
                                        : (float)(R.viewport_w ? R.viewport_w : 640);
@@ -383,7 +384,8 @@ int efx_render_quad(float x, float y, float w, float h, uint64_t texture,
     cam.x = cx;
     cam.y = cy;
     efx_affine view = efx_camera_matrix(&cam, fw, fh);
-    efx_affine model = efx_quad_matrix(x, y, w, h, rotation_deg, scale);
+    efx_affine model = efx_quad_matrix(x, y, origin_x, origin_y,
+                                       rotation_deg, scale);
 
     efx_quad_record rec;
     rec.m = efx_affine_mul(view, model);

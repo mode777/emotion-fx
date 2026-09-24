@@ -11,11 +11,13 @@ const tex = efx.createTexture(
     efx.createImageData({ width: 4, height: 4, pixels: pixels }));
 function update() {}
 function render() {
-    efx.drawQuad(60, 60, 160, 160, tex);                          // full texture
-    efx.drawQuad(280, 60, 160, 160, tex, {                        // left half
+    efx.drawQuad(60, 60, tex, { size: [160, 160] });              // full texture stretched
+    efx.drawQuad(280, 60, tex, {                                  // left half
+        size: [160, 160],
         sourceRect: { x: 0, y: 0, w: 2, h: 4 },
     });
-    efx.drawQuad(500, 60, 80, 160, tex, {                         // top-left quarter stretched
+    efx.drawQuad(500, 60, tex, {                                  // top-left quarter stretched
+        size: [80, 160],
         sourceRect: { x: 0, y: 0, w: 1, h: 1 },
     });
 }

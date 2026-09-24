@@ -96,7 +96,8 @@ uint64_t efx_render_white_texture(void);
 /* recording */
 int efx_render_quad(float x, float y, float w, float h, uint64_t texture,
                     const float color[4], float rotation_deg, float scale,
-                    const float src_rect[4], int has_src);
+                    const float src_rect[4], int has_src,
+                    float origin_x, float origin_y);
 const efx_quad_record *efx_render_records(int *count);
 const efx_draw_run *efx_render_runs(int *count); /* batched playback plan */
 
@@ -107,7 +108,8 @@ void efx_render_end_frame(void);   /* flush deferred texture destroys */
 /* affine/math helpers (exposed for unit tests) */
 efx_affine efx_affine_mul(efx_affine f, efx_affine g); /* f(g(p)) */
 efx_affine efx_camera_matrix(const efx_camera2d *cam, float fw, float fh);
-efx_affine efx_quad_matrix(float x, float y, float w, float h,
+efx_affine efx_quad_matrix(float x, float y,
+                           float origin_x, float origin_y,
                            float rotation_deg, float scale);
 
 #endif

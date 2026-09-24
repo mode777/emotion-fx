@@ -186,6 +186,31 @@ function __efxEnsureApi() {
         bridge['_efx_bridge_texture_destroy'](this.__handle);
     };
 
+    /* read-only query properties, resolved through the render layer's
+       texture registry at read time (parity with the desktop binding) */
+    Object.defineProperty(EfxTexture.prototype, 'width', {
+        get: function () {
+            if (!(this instanceof EfxTexture)) {
+                throw new TypeError('expected a Texture');
+            }
+            if (!this.__alive) {
+                throw new TypeError('using a destroyed resource');
+            }
+            return bridge['_efx_bridge_texture_width'](this.__handle);
+        },
+    });
+    Object.defineProperty(EfxTexture.prototype, 'height', {
+        get: function () {
+            if (!(this instanceof EfxTexture)) {
+                throw new TypeError('expected a Texture');
+            }
+            if (!this.__alive) {
+                throw new TypeError('using a destroyed resource');
+            }
+            return bridge['_efx_bridge_texture_height'](this.__handle);
+        },
+    });
+
     function liveImageData(v) {
         if (!(v instanceof EfxImageData)) {
             throw new TypeError('expected an ImageData');
@@ -374,30 +399,29 @@ function __efxEnsureApi() {
             }
             return new EfxTexture(handle, false);
         },
-        drawQuad: function (x, y, w, h, texture, opts) {
-            if (arguments.length < 5) {
-                throw new TypeError('drawQuad requires (x, y, w, h, texture, opts?)');
+        drawQuad: function (x, y, texture, opts) {
+            if (arguments.length < 3) {
+                throw new TypeError('drawQuad requires (x, y, texture, opts?)');
             }
-            var fx = __efxNumber(x, 'x, y, w, h must be numbers');
-            var fy = __efxNumber(y, 'x, y, w, h must be numbers');
-            var fw = __efxNumber(w, 'x, y, w, h must be numbers');
-            var fh = __efxNumber(h, 'x, y, w, h must be numbers');
-            if (!isFinite(fx) || !isFinite(fy) || !isFinite(fw) || !isFinite(fh)) {
-                throw new RangeError('x, y, w, h must be finite');
-            }
-            if (fw <= 0 || fh <= 0) {
-                throw new RangeError('w and h must be > 0');
+            var fx = __efxNumber(x, 'x and y must be numbers');
+            var fy = __efxNumber(y, 'x and y must be numbers');
+            if (!isFinite(fx) || !isFinite(fy)) {
+                throw new RangeError('x and y must be finite');
             }
             var tex = liveTexture(texture);
             var color = [1, 1, 1, 1];
             var rotation = 0, scale = 1;
             var src = [0, 0, 0, 0];
             var hasSrc = false;
-            if (arguments.length >= 6 && opts !== undefined) {
+            var size = [0, 0];
+            var hasSize = false;
+            var origin = [0, 0];
+            var hasOrigin = false;
+            if (arguments.length >= 4 && opts !== undefined) {
                 if (!__efxIsObject(opts)) {
                     throw new TypeError('opts must be an object');
                 }
-                var known = { color: 1, rotation: 1, scale: 1, sourceRect: 1 };
+                var known = { color: 1, rotation: 1, scale: 1, sourceRect: 1, size: 1, origin: 1 };
                 var names = Object.getOwnPropertyNames(opts);
                 for (var i = 0; i < names.length; i++) {
                     if (!known[names[i]]) {
@@ -419,6 +443,19 @@ function __efxEnsureApi() {
                         throw new RangeError('scale must be > 0');
                     }
                 }
+                var zv = opts['size'];
+                if (zv !== undefined) {
+                    size = __efxFloatArray(zv, 2);
+                    if (size[0] <= 0 || size[1] <= 0) {
+                        throw new RangeError('size entries must be > 0');
+                    }
+                    hasSize = true;
+                }
+                var ov = opts['origin'];
+                if (ov !== undefined) {
+                    origin = __efxFloatArray(ov, 2);
+                    hasOrigin = true;
+                }
                 var srcv = opts['sourceRect'];
                 if (srcv !== undefined) {
                     if (!__efxIsObject(srcv)) {
@@ -428,18 +465,34 @@ function __efxEnsureApi() {
                     for (var j = 0; j < 4; j++) {
                         src[j] = __efxFinite(srcv[skeys[j]], 'sourceRect fields must be finite numbers');
                     }
+                    if (src[2] <= 0 || src[3] <= 0) {
+                        throw new RangeError('sourceRect extent must be > 0');
+                    }
                     var tw = bridge['_efx_bridge_texture_width'](tex.__handle);
                     var th = bridge['_efx_bridge_texture_height'](tex.__handle);
-                    if (src[2] < 0 || src[3] < 0 || src[0] < 0 || src[1] < 0 ||
+                    if (src[0] < 0 || src[1] < 0 ||
                         src[0] + src[2] > tw || src[1] + src[3] > th) {
                         throw new RangeError('sourceRect outside texture bounds');
                     }
                     hasSrc = true;
                 }
             }
+            var fw, fh;
+            if (hasSize) {
+                fw = size[0];
+                fh = size[1];
+            } else if (hasSrc) {
+                fw = src[2];
+                fh = src[3];
+            } else {
+                fw = bridge['_efx_bridge_texture_width'](tex.__handle);
+                fh = bridge['_efx_bridge_texture_height'](tex.__handle);
+            }
+            var ox = hasOrigin ? origin[0] : fw * 0.5;
+            var oy = hasOrigin ? origin[1] : fh * 0.5;
             var rc = bridge['_efx_bridge_draw_quad'](tex.__handle, fx, fy, fw, fh,
                 color[0], color[1], color[2], color[3], rotation, scale,
-                src[0], src[1], src[2], src[3], hasSrc ? 1 : 0);
+                src[0], src[1], src[2], src[3], hasSrc ? 1 : 0, ox, oy);
             if (rc === 1) {
                 throw new RangeError('display list budget exceeded');
             }

@@ -16,7 +16,9 @@ const tex = efx.createTexture(img);
 
 tex.destroy();
 tex.destroy();
-expectThrow('draw-destroyed-texture', () => efx.drawQuad(0, 0, 4, 4, tex));
+expectThrow('draw-destroyed-texture', () => efx.drawQuad(0, 0, tex));
+expectThrow('width-destroyed-texture', () => tex.width);
+expectThrow('height-destroyed-texture', () => tex.height);
 
 img.destroy();
 img.destroy();

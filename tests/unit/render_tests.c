@@ -71,7 +71,7 @@ static int compose_camera(void) {
 
 static int compose_quad(void) {
     /* corner anchoring, identity transform */
-    efx_affine m = efx_quad_matrix(10, 20, 100, 50, 0, 1);
+    efx_affine m = efx_quad_matrix(10, 20, 50, 25, 0, 1);
     float px = m.a * 0 + m.c * 0 + m.tx;
     float py = m.b * 0 + m.d * 0 + m.ty;
     if (!feq(px, 10) || !feq(py, 20)) return fail("top-left anchor");
@@ -79,12 +79,12 @@ static int compose_quad(void) {
     py = m.b * 100 + m.d * 50 + m.ty;
     if (!feq(px, 110) || !feq(py, 70)) return fail("bottom-right corner");
     /* rotation pivots on quad center */
-    m = efx_quad_matrix(10, 20, 100, 50, 90, 1);
+    m = efx_quad_matrix(10, 20, 50, 25, 90, 1);
     px = m.a * 0 + m.c * 0 + m.tx;
     py = m.b * 0 + m.d * 0 + m.ty;
     if (!feq(px, 85) || !feq(py, -5)) return fail("rotation pivot center");
     /* scale pivots on quad center: corners at center ± (2*50, 2*25) */
-    m = efx_quad_matrix(10, 20, 100, 50, 0, 2);
+    m = efx_quad_matrix(10, 20, 50, 25, 0, 2);
     px = m.a * 0 + m.c * 0 + m.tx;
     py = m.b * 0 + m.d * 0 + m.ty;
     if (!feq(px, -40) || !feq(py, -5)) return fail("scale pivot center");
@@ -96,14 +96,14 @@ static int value_snapshot(void) {
     efx_render_set_viewport(1024, 768);
     efx_camera2d cam = {640, 480, 320, 240, 1, 0};
     efx_render_set_camera(&cam);
-    efx_render_quad(0, 0, 32, 32, 0, NULL, 0, 1, NULL, 0);
+    efx_render_quad(0, 0, 32, 32, 0, NULL, 0, 1, NULL, 0, 16, 16);
     efx_camera2d cam2 = {640, 480, 100, 100, 1, 0};
     efx_render_set_camera(&cam2);
-    efx_render_quad(0, 0, 32, 32, 0, NULL, 0, 1, NULL, 0);
+    efx_render_quad(0, 0, 32, 32, 0, NULL, 0, 1, NULL, 0, 16, 16);
 
     /* camera at record time applies; second quad sees new camera */
     efx_affine expect = efx_camera_matrix(&cam, 640, 480);
-    expect = efx_affine_mul(expect, efx_quad_matrix(0, 0, 32, 32, 0, 1));
+    expect = efx_affine_mul(expect, efx_quad_matrix(0, 0, 16, 16, 0, 1));
     int count = 0;
     const efx_quad_record *recs = efx_render_records(&count);
     if (count != 2) return fail("record count");
@@ -120,7 +120,7 @@ static int value_snapshot(void) {
 static int default_camera_viewport(void) {
     install_mock_sink();
     efx_render_set_viewport(1024, 600);
-    efx_render_quad(0, 0, 8, 8, 0, NULL, 0, 1, NULL, 0);
+    efx_render_quad(0, 0, 8, 8, 0, NULL, 0, 1, NULL, 0, 4, 4);
     int count = 0;
     const efx_quad_record *recs = efx_render_records(&count);
     if (recs[0].frame_w != 1024 || recs[0].frame_h != 600)
@@ -131,7 +131,7 @@ static int default_camera_viewport(void) {
     /* frame set through camera wins over viewport */
     efx_camera2d cam = {640, 480, 320, 240, 1, 0};
     efx_render_set_camera(&cam);
-    efx_render_quad(0, 0, 8, 8, 0, NULL, 0, 1, NULL, 0);
+    efx_render_quad(0, 0, 8, 8, 0, NULL, 0, 1, NULL, 0, 4, 4);
     recs = efx_render_records(&count);
     if (recs[1].frame_w != 640 || recs[1].frame_h != 480)
         return fail("explicit frame");
@@ -142,9 +142,9 @@ static int default_camera_viewport(void) {
 
 static int blend_snapshot(void) {
     install_mock_sink();
-    efx_render_quad(0, 0, 8, 8, 0, NULL, 0, 1, NULL, 0);
+    efx_render_quad(0, 0, 8, 8, 0, NULL, 0, 1, NULL, 0, 4, 4);
     efx_render_set_blend(EFX_BLEND_ADDITIVE);
-    efx_render_quad(0, 0, 8, 8, 0, NULL, 0, 1, NULL, 0);
+    efx_render_quad(0, 0, 8, 8, 0, NULL, 0, 1, NULL, 0, 4, 4);
     if (efx_render_set_blend(99) == 0) return fail("invalid blend accepted");
     int count = 0;
     const efx_quad_record *recs = efx_render_records(&count);
@@ -160,7 +160,7 @@ static int record_budget(void) {
     efx_render_install_sink(&sink);
     int pushed = 0;
     for (;;) {
-        int rc = efx_render_quad(0, 0, 1, 1, 0, NULL, 0, 1, NULL, 0);
+        int rc = efx_render_quad(0, 0, 1, 1, 0, NULL, 0, 1, NULL, 0, 0.5f, 0.5f);
         if (rc == EFX_RENDER_ERR_BUDGET) break;
         if (rc != EFX_RENDER_OK) return fail("unexpected error in budget loop");
         pushed++;
@@ -217,7 +217,7 @@ static int record_fields(void) {
     uint64_t tex = efx_render_texture_create(64, 32, px);
     float color[4] = {1, 0.5, 0.25, 0.125};
     float src[4] = {8, 4, 16, 8};
-    efx_render_quad(1, 2, 30, 40, tex, color, 45, 2, src, 1);
+    efx_render_quad(1, 2, 30, 40, tex, color, 45, 2, src, 1, 15, 20);
     int count = 0;
     const efx_quad_record *r = efx_render_records(&count);
     if (count != 1) return fail("count");
@@ -227,7 +227,7 @@ static int record_fields(void) {
     if (!feq(r[0].color[1], 0.5f) || !feq(r[0].color[3], 0.125f))
         return fail("tint");
     /* default source rect = full texture */
-    efx_render_quad(0, 0, 4, 4, tex, NULL, 0, 1, NULL, 0);
+    efx_render_quad(0, 0, 4, 4, tex, NULL, 0, 1, NULL, 0, 2, 2);
     r = efx_render_records(&count);
     if (!feq(r[1].sw, 64) || !feq(r[1].sh, 32)) return fail("default src");
     /* default tint = opaque white */
@@ -243,13 +243,13 @@ static int batching(void) {
     uint64_t t1 = efx_render_texture_create(4, 4, px);
     uint64_t t2 = efx_render_texture_create(4, 4, px);
     /* sequence: A A B A  -> three runs (t1x2, t2, t1) */
-    efx_render_quad(0, 0, 4, 4, t1, NULL, 0, 1, NULL, 0);
-    efx_render_quad(5, 0, 4, 4, t1, NULL, 0, 1, NULL, 0);
+    efx_render_quad(0, 0, 4, 4, t1, NULL, 0, 1, NULL, 0, 2, 2);
+    efx_render_quad(5, 0, 4, 4, t1, NULL, 0, 1, NULL, 0, 2, 2);
     efx_render_set_blend(EFX_BLEND_ADDITIVE);
-    efx_render_quad(9, 0, 4, 4, t1, NULL, 0, 1, NULL, 0);
-    efx_render_quad(12, 0, 4, 4, t2, NULL, 0, 1, NULL, 0);
+    efx_render_quad(9, 0, 4, 4, t1, NULL, 0, 1, NULL, 0, 2, 2);
+    efx_render_quad(12, 0, 4, 4, t2, NULL, 0, 1, NULL, 0, 2, 2);
     efx_render_set_blend(EFX_BLEND_ALPHA);
-    efx_render_quad(15, 0, 4, 4, t1, NULL, 0, 1, NULL, 0);
+    efx_render_quad(15, 0, 4, 4, t1, NULL, 0, 1, NULL, 0, 2, 2);
     int run_count = 0;
     const efx_draw_run *runs = efx_render_runs(&run_count);
     if (run_count != 4) return fail("expected 4 runs");

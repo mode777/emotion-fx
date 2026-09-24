@@ -240,6 +240,39 @@ static JSClassDef imagedata_class_def = {
     .finalizer = imagedata_finalizer,
 };
 
+/* read-only query properties (Texture.width / Texture.height), resolved
+ * through the render layer's texture registry at read time */
+static JSValue efx_js_texture_getWidth(JSContext *ctx, JSValueConst this_val) {
+    efxjs_texture *t = JS_GetOpaque2(ctx, this_val, texture_class_id);
+    if (!t) {
+        return type_error(ctx, "expected a Texture");
+    }
+    if (!t->alive) {
+        return type_error(ctx, "using a destroyed resource");
+    }
+    int w = 0, h = 0;
+    efx_render_texture_size(t->handle, &w, &h);
+    return JS_NewInt32(ctx, w);
+}
+
+static JSValue efx_js_texture_getHeight(JSContext *ctx, JSValueConst this_val) {
+    efxjs_texture *t = JS_GetOpaque2(ctx, this_val, texture_class_id);
+    if (!t) {
+        return type_error(ctx, "expected a Texture");
+    }
+    if (!t->alive) {
+        return type_error(ctx, "using a destroyed resource");
+    }
+    int w = 0, h = 0;
+    efx_render_texture_size(t->handle, &w, &h);
+    return JS_NewInt32(ctx, h);
+}
+
+static const JSCFunctionListEntry texture_proto_funcs[] = {
+    JS_CGETSET_DEF("width", efx_js_texture_getWidth, NULL),
+    JS_CGETSET_DEF("height", efx_js_texture_getHeight, NULL),
+};
+
 int efx_api_init(JSContext *ctx) {
     static int registered;
     if (registered) {
@@ -259,6 +292,9 @@ int efx_api_init(JSContext *ctx) {
     JSValue m = JS_NewCFunction(ctx, js_destroy_resource, "destroy", 0);
     JS_SetPropertyStr(ctx, tex_proto, "destroy", JS_DupValue(ctx, m));
     JS_SetPropertyStr(ctx, img_proto, "destroy", m);
+    JS_SetPropertyFunctionList(ctx, tex_proto, texture_proto_funcs,
+                               (int)(sizeof(texture_proto_funcs) /
+                                     sizeof(texture_proto_funcs[0])));
     JS_SetClassProto(ctx, texture_class_id, tex_proto);
     JS_SetClassProto(ctx, imagedata_class_id, img_proto);
     registered = 1;
@@ -535,21 +571,17 @@ JSValue efx_js_createTexture(JSContext *ctx, JSValueConst this_val, int argc, JS
 
 JSValue efx_js_drawQuad(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
-    if (argc < 5) {
-        return type_error(ctx, "drawQuad requires (x, y, w, h, texture, opts?)");
+    if (argc < 3) {
+        return type_error(ctx, "drawQuad requires (x, y, texture, opts?)");
     }
-    double x, y, w, h;
-    if (JS_ToFloat64(ctx, &x, argv[0]) < 0 || JS_ToFloat64(ctx, &y, argv[1]) < 0 ||
-        JS_ToFloat64(ctx, &w, argv[2]) < 0 || JS_ToFloat64(ctx, &h, argv[3]) < 0) {
-        return type_error(ctx, "x, y, w, h must be numbers");
+    double x, y;
+    if (JS_ToFloat64(ctx, &x, argv[0]) < 0 || JS_ToFloat64(ctx, &y, argv[1]) < 0) {
+        return type_error(ctx, "x and y must be numbers");
     }
-    if (!isfinite(x) || !isfinite(y) || !isfinite(w) || !isfinite(h)) {
-        return range_error(ctx, "x, y, w, h must be finite");
+    if (!isfinite(x) || !isfinite(y)) {
+        return range_error(ctx, "x and y must be finite");
     }
-    if (w <= 0 || h <= 0) {
-        return range_error(ctx, "w and h must be > 0");
-    }
-    efxjs_texture *tex = get_live_texture(ctx, argv[4]);
+    efxjs_texture *tex = get_live_texture(ctx, argv[2]);
     if (!tex) {
         return JS_EXCEPTION;
     }
@@ -558,13 +590,17 @@ JSValue efx_js_drawQuad(JSContext *ctx, JSValueConst this_val, int argc, JSValue
     float rotation = 0, scale = 1;
     float src[4] = {0, 0, 0, 0};
     int has_src = 0;
+    float size[2] = {0, 0};
+    int has_size = 0;
+    float origin[2] = {0, 0};
+    int has_origin = 0;
 
-    if (argc >= 6 && !JS_IsUndefined(argv[5])) {
-        if (!JS_IsObject(argv[5])) {
+    if (argc >= 4 && !JS_IsUndefined(argv[3])) {
+        if (!JS_IsObject(argv[3])) {
             return type_error(ctx, "opts must be an object");
         }
-        JSValueConst opts = argv[5];
-        static const char *known[] = {"color", "rotation", "scale", "sourceRect"};
+        JSValueConst opts = argv[3];
+        static const char *known[] = {"color", "rotation", "scale", "sourceRect", "size", "origin"};
         JSPropertyEnum *props = NULL;
         uint32_t nprops = 0;
         if (JS_GetOwnPropertyNames(ctx, &props, &nprops, opts,
@@ -572,7 +608,7 @@ JSValue efx_js_drawQuad(JSContext *ctx, JSValueConst this_val, int argc, JSValue
             for (uint32_t i = 0; i < nprops; i++) {
                 const char *k = JS_AtomToCString(ctx, props[i].atom);
                 int ok = 0;
-                for (int j = 0; j < 4; j++) {
+                for (int j = 0; j < 6; j++) {
                     if (k && strcmp(k, known[j]) == 0) {
                         ok = 1;
                         break;
@@ -628,6 +664,30 @@ JSValue efx_js_drawQuad(JSContext *ctx, JSValueConst this_val, int argc, JSValue
         }
         JS_FreeValue(ctx, sv);
 
+        JSValue zv = JS_GetPropertyStr(ctx, opts, "size");
+        if (!JS_IsUndefined(zv)) {
+            if (get_float_array(ctx, zv, size, 2) != 0) {
+                JS_FreeValue(ctx, zv);
+                return JS_EXCEPTION;
+            }
+            if (size[0] <= 0 || size[1] <= 0) {
+                JS_FreeValue(ctx, zv);
+                return range_error(ctx, "size entries must be > 0");
+            }
+            has_size = 1;
+        }
+        JS_FreeValue(ctx, zv);
+
+        JSValue ov = JS_GetPropertyStr(ctx, opts, "origin");
+        if (!JS_IsUndefined(ov)) {
+            if (get_float_array(ctx, ov, origin, 2) != 0) {
+                JS_FreeValue(ctx, ov);
+                return JS_EXCEPTION;
+            }
+            has_origin = 1;
+        }
+        JS_FreeValue(ctx, ov);
+
         JSValue srcv = JS_GetPropertyStr(ctx, opts, "sourceRect");
         if (!JS_IsUndefined(srcv)) {
             if (!JS_IsObject(srcv)) {
@@ -647,9 +707,12 @@ JSValue efx_js_drawQuad(JSContext *ctx, JSValueConst this_val, int argc, JSValue
                 src[i] = (float)d;
             }
             JS_FreeValue(ctx, srcv);
+            if (src[2] <= 0 || src[3] <= 0) {
+                return range_error(ctx, "sourceRect extent must be > 0");
+            }
             int tw = 0, th = 0;
             efx_render_texture_size(tex->handle, &tw, &th);
-            if (src[2] < 0 || src[3] < 0 || src[0] < 0 || src[1] < 0 ||
+            if (src[0] < 0 || src[1] < 0 ||
                 src[0] + src[2] > (float)tw || src[1] + src[3] > (float)th) {
                 return range_error(ctx, "sourceRect outside texture bounds");
             }
@@ -657,8 +720,26 @@ JSValue efx_js_drawQuad(JSContext *ctx, JSValueConst this_val, int argc, JSValue
         }
     }
 
-    int rc = efx_render_quad((float)x, (float)y, (float)w, (float)h,
-                             tex->handle, color, rotation, scale, src, has_src);
+    /* size derivation: explicit size -> sourceRect extent -> texture pixels */
+    float w, h;
+    if (has_size) {
+        w = size[0];
+        h = size[1];
+    } else if (has_src) {
+        w = src[2];
+        h = src[3];
+    } else {
+        int tw = 0, th = 0;
+        efx_render_texture_size(tex->handle, &tw, &th);
+        w = (float)tw;
+        h = (float)th;
+    }
+    float origin_x = has_origin ? origin[0] : w * 0.5f;
+    float origin_y = has_origin ? origin[1] : h * 0.5f;
+
+    int rc = efx_render_quad((float)x, (float)y, w, h,
+                             tex->handle, color, rotation, scale, src, has_src,
+                             origin_x, origin_y);
     if (rc == EFX_RENDER_ERR_BUDGET) {
         return range_error(ctx, "display list budget exceeded");
     }
