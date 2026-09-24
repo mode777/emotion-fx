@@ -80,8 +80,10 @@ static void efx_capture_setup(void) {
         return;
     }
     id<MTLDevice> mtl = (__bridge id<MTLDevice>)dev;
+    /* BGRA8: the sapp swapchain format — matches the environment default
+       the pipelines are built with */
     MTLTextureDescriptor *td = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
                                      width:EFX_CAP_W height:EFX_CAP_H
                                  mipmapped:NO];
     td.usage = MTLTextureUsageRenderTarget;

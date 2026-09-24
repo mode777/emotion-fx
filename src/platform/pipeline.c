@@ -290,8 +290,9 @@ void efx_pipeline_install(void) {
                        .attrs = {[0] = {.format = SG_VERTEXFORMAT_FLOAT2},
                                  [1] = {.format = SG_VERTEXFORMAT_FLOAT2, .offset = 8},
                                  [2] = {.format = SG_VERTEXFORMAT_UBYTE4N, .offset = 16}}},
-            .colors[0] = {.pixel_format = SG_PIXELFORMAT_RGBA8,
-                          .blend = blends[i]},
+            /* color format: environment default (matches the swapchain
+               and the capture attachments on every backend) */
+            .colors[0] = {.blend = blends[i]},
             .depth = {.compare = SG_COMPAREFUNC_ALWAYS, .write_enabled = false},
             .cull_mode = SG_CULLMODE_NONE,
             .sample_count = 1,
@@ -322,8 +323,7 @@ void efx_pipeline_install(void) {
                                 [ATTR_mesh_a_color] = {.format = SG_VERTEXFORMAT_FLOAT4, .offset = 12}}},
             /* slots 2 (normal) and 3 (uv) join in F4 when the canned
                shader starts consuming them */
-            .colors[0] = {.pixel_format = SG_PIXELFORMAT_RGBA8,
-                          .blend = blends[i]},
+            .colors[0] = {.blend = blends[i]},
             .depth = {.compare = SG_COMPAREFUNC_LESS_EQUAL,
                       .write_enabled = true},
             .cull_mode = SG_CULLMODE_BACK,
