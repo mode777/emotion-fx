@@ -11,6 +11,39 @@ env:
   EFX_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', github.sha) }}
 
 jobs:
+  diag-captures:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build player
+        run: cmake --build build --target player -j4
+      - name: Diagnostic capture matrix
+        shell: bash
+        run: |
+          mkdir -p diag
+          for nocull in 0 1; do
+            for noremap in 0 1; do
+              for nodepth in 0 1; do
+                tag="cull${nocull}_remap${noremap}_depth${nodepth}"
+                export EFX_DIAG_NOCULL=$nocull EFX_DIAG_NOREMAP=$noremap EFX_DIAG_NODEPTH=$nodepth
+                for scene in cube3d depth3d surfaces3d; do
+                  ./build/player --capture-frame 2 --capture-output "diag/${scene}-${tag}.png" tests/goldens/$scene || echo "capture failed: $scene $tag"
+                done
+              done
+            done
+          done
+      - name: Upload diagnostic captures
+        uses: actions/upload-artifact@v4
+        with:
+          name: diag-${{ matrix.os }}
+          path: diag/
+
   native:
     name: build+test (${{ matrix.os }})
     strategy:
