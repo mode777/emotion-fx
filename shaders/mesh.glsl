@@ -14,10 +14,13 @@ layout(binding=0) uniform vs_params {
     mat4 mvp;
 };
 
+/* Attribute slots must be declared consumed-first: the canned F3 shader
+   reads only position and color, and sokol requires pipeline attribute
+   slots to be contiguous from 0 (F4 re-adds normal/uv as slots 2/3). */
 in vec3 a_pos;
+in vec4 a_color;
 in vec3 a_normal;
 in vec2 a_uv;
-in vec4 a_color;
 
 out vec4 efx_color;
 

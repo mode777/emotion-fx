@@ -313,6 +313,8 @@ void efx_pipeline_install(void) {
                       .buffers[0].stride = (int)sizeof(pipe_mesh_vertex),
                       .attrs = {[ATTR_mesh_a_pos] = {.format = SG_VERTEXFORMAT_FLOAT3, .offset = 0},
                                 [ATTR_mesh_a_color] = {.format = SG_VERTEXFORMAT_FLOAT4, .offset = 32}}},
+            /* slots 2 (normal @12) and 3 (uv @24) join in F4 when the
+               canned shader starts consuming them */
             .colors[0] = {.pixel_format = SG_PIXELFORMAT_RGBA8,
                           .blend = blends[i]},
             .depth = {.compare = SG_COMPAREFUNC_LESS_EQUAL,
