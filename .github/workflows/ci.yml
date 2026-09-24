@@ -20,7 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -DSOKOL_DEBUG_LOG=ON
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake -B build -DCMAKE_C_FLAGS="/DSOKOL_DEBUG" -DCMAKE_CXX_FLAGS="/DSOKOL_DEBUG"
+          else
+            cmake -B build -DCMAKE_C_FLAGS="-DSOKOL_DEBUG" -DCMAKE_CXX_FLAGS="-DSOKOL_DEBUG"
+          fi
       - name: Build player
         shell: bash
         run: |
