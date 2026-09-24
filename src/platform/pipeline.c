@@ -249,6 +249,12 @@ void efx_pipeline_install(void) {
     DIAG_POSONLY = diag_env("EFX_DIAG_POSONLY");
     DIAG_U16 = diag_env("EFX_DIAG_U16");
     DIAG_HARDCUBE = diag_env("EFX_DIAG_HARDCUBE");
+    fprintf(stderr,
+            "DIAG: hardcube=%d nocull=%d noremap=%d nodepth=%d noib=%d "
+            "posonly=%d u16=%d remap=%d\n",
+            DIAG_HARDCUBE, P.diag_nocull, P.diag_noremap, P.diag_nodepth,
+            DIAG_NOIB, DIAG_POSONLY, DIAG_U16, P.depth_remap);
+    fflush(stderr);
 
     P.quad_shd = sg_make_shader(quad_shader_desc(sg_query_backend()));
     P.mesh_shd = sg_make_shader(mesh_shader_desc(sg_query_backend()));
@@ -440,6 +446,8 @@ void efx_pipeline_play(void) {
         if (pv && *pv) {
             probe = *pv - '0';
         }
+        fprintf(stderr, "DIAG: probe %d drawing\n", probe);
+        fflush(stderr);
         /* probe 1: FULL-SCREEN quad — unmistakable if it renders.
            stride 20: float2 pos, float2 uv, ub4n rgba */
         static const uint8_t qv[4 * 20] = {
