@@ -11,55 +11,6 @@ env:
   EFX_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', github.sha) }}
 
 jobs:
-  diag-captures:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Configure
-        shell: bash
-        run: |
-          cmake -B build -DCMAKE_C_FLAGS="-DSOKOL_DEBUG" -DCMAKE_CXX_FLAGS="-DSOKOL_DEBUG"
-      - name: Build player
-        shell: bash
-        run: |
-          cmake -B build -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-DSOKOL_DEBUG" -DCMAKE_CXX_FLAGS="-DSOKOL_DEBUG"
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake --build build --config Release --target player efx_imgdiff cube_diag -j4
-          else
-            cmake --build build --target player efx_imgdiff cube_diag -j4
-          fi
-      - name: Diagnostic capture matrix
-        shell: bash
-        run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then PLAYER=build/Release/player.exe; else PLAYER=build/player; fi
-          mkdir -p diag
-          for combo in "0_1_0_0_0_0" "0_1_0_0_1_0" "0_1_0_0_0_1" "1_1_0_0_1_0" "0_1_1_0_0_1" "0_0_0_1_0_0" "0_1_0_1_1_0"; do
-            # hardcube probes (bypass everything but the pipelines)
-            for probe in 1 2 3; do
-              EFX_DIAG_HARDCUBE=1 EFX_DIAG_PROBE=$probe "$PLAYER" --capture-frame 2 --capture-output "diag/hardcube-probe$probe.png" tests/goldens/cube3d || echo "probe$probe failed"
-            done
-            # OFFICIAL cube-sapp sample adaptation (verbatim pipeline/frame)
-            if [ "$RUNNER_OS" = "Windows" ]; then CDIAG=build/tests/Release/cube_diag.exe; else CDIAG=build/tests/cube_diag; fi
-            for variant in 0 1 2 3 4; do
-              CUBE_DIAG_VARIANT=$variant "$CDIAG" "diag/cube_diag-v$variant.png" || echo "v$variant failed"
-            done
-            IFS=_ read nocull noremap nodepth noib posonly u16 <<< "$combo"
-            tag="cul${nocull}_rem${noremap}_dep${nodepth}_ib${noib}_po${posonly}_u16${u16}"
-            export EFX_DIAG_NOCULL=$nocull EFX_DIAG_NOREMAP=$noremap EFX_DIAG_NODEPTH=$nodepth EFX_DIAG_NOIB=$noib EFX_DIAG_POSONLY=$posonly EFX_DIAG_U16=$u16
-            for scene in cube3d depth3d surfaces3d; do
-              "$PLAYER" --capture-frame 2 --capture-output "diag/${scene}-${tag}.png" tests/goldens/$scene || echo "capture failed: $scene $tag"
-            done
-          done
-      - name: Upload diagnostic captures
-        uses: actions/upload-artifact@v4
-        with:
-          name: diag-${{ matrix.os }}
-          path: diag/
-
   native:
     name: build+test (${{ matrix.os }})
     strategy:
