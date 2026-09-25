@@ -84,6 +84,10 @@ static void init(void) {
         .environment = sglue_environment(),
         .logger.func = diag_slog,
     });
+#if defined(SOKOL_METAL)
+    const void *mdev = sglue_environment().metal.device;
+    diag_attachments_setup((__bridge id<MTLDevice>)mdev);
+#endif
 
     // cube vertex buffer (verbatim from cube-sapp.c)
     float vertices[] = {
@@ -162,18 +166,82 @@ static void init(void) {
     };
 }
 
+#if defined(SOKOL_METAL)
+static id<MTLTexture> diag_color_tex;   /* Managed, readback-able */
+static sg_image diag_color_img;
+static sg_view diag_color_view;
+static id<MTLTexture> diag_depth_tex;
+static sg_image diag_depth_img;
+static sg_view diag_depth_view;
+static sg_attachments diag_atts;
+static void diag_attachments_setup(id<MTLDevice> dev) {
+    MTLTextureDescriptor *cd = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                     width:640 height:480 mipmapped:NO];
+    cd.usage = MTLTextureUsageRenderTarget;
+    cd.storageMode = MTLStorageModeManaged;
+    id<MTLTexture> ctex = [dev newTextureWithDescriptor:cd];
+    diag_color_tex = ctex;
+    diag_color_img = sg_make_image(&(sg_image_desc){
+        .width = 640, .height = 480,
+        .pixel_format = SG_PIXELFORMAT_BGRA8,
+        .usage.color_attachment = true,
+        .mtl_textures[0] = (__bridge const void *)ctex,
+    });
+    diag_color_view = sg_make_view(&(sg_view_desc){
+        .color_attachment.image = diag_color_img});
+    MTLTextureDescriptor *dd = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                                     width:640 height:480 mipmapped:NO];
+    dd.usage = MTLTextureUsageRenderTarget;
+    dd.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> dtex = [dev newTextureWithDescriptor:dd];
+    diag_depth_tex = dtex;
+    diag_depth_img = sg_make_image(&(sg_image_desc){
+        .width = 640, .height = 480,
+        .pixel_format = SG_PIXELFORMAT_DEPTH,
+        .usage.depth_stencil_attachment = true,
+        .mtl_textures[0] = (__bridge const void *)dtex,
+    });
+    diag_depth_view = sg_make_view(&(sg_view_desc){
+        .depth_stencil_attachment.image = diag_depth_img});
+    sg_attachments_desc ad = {0};
+    ad.colors[0] = diag_color_view;
+    ad.depth_stencil = diag_depth_view;
+    diag_atts = sg_make_attachments(&ad);
+}
+#endif
+
 static void frame(void) {
     const float t = (float)(sapp_frame_duration() * 60.0);
     state.rx += 1.0f * t; state.ry += 2.0f * t;
     const vs_params_t vs_params = compute_vsparams(state.rx, state.ry);
 
+#if defined(SOKOL_METAL)
     sg_begin_pass(&(sg_pass){
         .action.colors[0] = {
             .load_action = SG_LOADACTION_CLEAR,
             .clear_value = { 0.25f, 0.5f, 0.75f, 1.0f }
         },
+        .action.depth = {
+            .load_action = SG_LOADACTION_CLEAR,
+            .clear_value = 1.0f
+        },
+        .attachments = diag_atts
+    });
+#else
+    sg_begin_pass(&(sg_pass){
+        .action.colors[0] = {
+            .load_action = SG_LOADACTION_CLEAR,
+            .clear_value = { 0.25f, 0.5f, 0.75f, 1.0f }
+        },
+        .action.depth = {
+            .load_action = SG_LOADACTION_CLEAR,
+            .clear_value = 1.0f
+        },
         .swapchain = sglue_swapchain()
     });
+#endif
     sg_apply_pipeline(state.pip);
     sg_apply_bindings(&state.bind);
     sg_apply_uniforms(UB_vs_params, &SG_RANGE(vs_params));
@@ -236,17 +304,14 @@ static void frame(void) {
     write_png(px, (int)bd.Width, (int)bd.Height);
     free(px);
 #elif defined(SOKOL_METAL)
-    /* Metal: synchronize + read the current drawable */
-    sg_swapchain sc = sglue_swapchain();
-    id<MTLDrawable> drawable = (__bridge id<MTLDrawable>)sc.metal.current_drawable;
-    id<MTLTexture> tex = (id<MTLTexture>)drawable;
-    id<MTLDevice> dev = tex.device;
-    int w = (int)tex.width;
-    int h = (int)tex.height;
+    /* Metal: synchronize + read the Managed offscreen color texture */
+    int w = (int)diag_color_tex.width;
+    int h = (int)diag_color_tex.height;
+    id<MTLDevice> dev = diag_color_tex.device;
     id<MTLCommandQueue> q = [dev newCommandQueue];
     id<MTLCommandBuffer> cb = [q commandBuffer];
     id<MTLBlitCommandEncoder> blit = [cb blitCommandEncoder];
-    [blit synchronizeTexture:tex slice:0 level:0];
+    [blit synchronizeTexture:diag_color_tex slice:0 level:0];
     [blit endEncoding];
     [cb commit];
     [cb waitUntilCompleted];
@@ -254,8 +319,17 @@ static void frame(void) {
     if (!px) {
         exit(3);
     }
-    [tex getBytes:px bytesPerRow:(NSUInteger)w * 4
-       fromRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0];
+    [diag_color_tex getBytes:px bytesPerRow:(NSUInteger)w * 4
+                  fromRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0];
+    /* BGRA -> RGBA */
+    for (int y = 0; y < h; y++) {
+        uint8_t *row = px + (size_t)y * w * 4;
+        for (int x = 0; x < w; x++) {
+            uint8_t b = row[x * 4 + 0];
+            row[x * 4 + 0] = row[x * 4 + 2];
+            row[x * 4 + 2] = b;
+        }
+    }
     write_png(px, w, h);
     free(px);
 #elif defined(SOKOL_GLCORE)
