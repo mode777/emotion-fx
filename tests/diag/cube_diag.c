@@ -33,6 +33,7 @@
 #define vs_params_t mesh_vs_params_t
 #include "../../shaders/mesh.h"
 #undef vs_params_t
+#define vs_params_t cube_vs_params_t
 #include "../../src/math/efx_math.h"
 
 
