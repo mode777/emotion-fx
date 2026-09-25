@@ -16,6 +16,9 @@
 #define SOKOL_GLCORE
 #endif
 
+#include <initguid.h>
+#include <d3d11.h>
+#include <dxgi.h>
 #include "sokol_gfx.h"
 #include "sokol_app.h"
 #include "sokol_glue.h"
@@ -25,9 +28,6 @@
 #include "cube-sapp.h"
 
 #if defined(_WIN32)
-#include <initguid.h>
-#include <d3d11.h>
-#include <dxgi.h>
 #endif
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -237,7 +237,7 @@ static void frame(void) {
     free(px);
 #elif defined(SOKOL_METAL)
     /* Metal: synchronize + read the current drawable */
-    id<MTLDrawable> drawable = (__bridge id<MTLDrawable>)sapp_metal_get_drawable();
+    id<MTLDrawable> drawable = (__bridge id<MTLDrawable>)sapp_metal_get_current_drawable();
     id<MTLTexture> tex = (id<MTLTexture>)drawable;
     id<MTLDevice> dev = tex.device;
     int w = (int)tex.width;
