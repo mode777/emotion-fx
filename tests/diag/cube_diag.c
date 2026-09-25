@@ -19,10 +19,10 @@
 #include "sokol_gfx.h"
 #include "sokol_app.h"
 #include "sokol_glue.h"
-#define SOKOL_SHDC_IMPL
-#include "cube-sapp.h"
 #define VECMATH_GENERICS
 #include "vecmath.h"
+#define SOKOL_SHDC_IMPL
+#include "cube-sapp.h"
 
 #if defined(_WIN32)
 #include <initguid.h>
