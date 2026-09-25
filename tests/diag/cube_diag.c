@@ -28,7 +28,7 @@
 #include "vecmath.h"
 #define SOKOL_SHDC_IMPL
 #include "cube-sapp.h"
-#include "mesh.h"
+#include "../../shaders/mesh.h"
 #include "../../src/math/efx_math.h"
 
 
