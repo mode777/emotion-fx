@@ -237,7 +237,8 @@ static void frame(void) {
     free(px);
 #elif defined(SOKOL_METAL)
     /* Metal: synchronize + read the current drawable */
-    id<MTLDrawable> drawable = (__bridge id<MTLDrawable>)sapp_metal_get_current_drawable();
+    sg_swapchain sc = sglue_swapchain();
+    id<MTLDrawable> drawable = (__bridge id<MTLDrawable>)sc.metal.current_drawable;
     id<MTLTexture> tex = (id<MTLTexture>)drawable;
     id<MTLDevice> dev = tex.device;
     int w = (int)tex.width;

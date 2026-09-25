@@ -43,7 +43,7 @@ jobs:
               EFX_DIAG_HARDCUBE=1 EFX_DIAG_PROBE=$probe "$PLAYER" --capture-frame 2 --capture-output "diag/hardcube-probe$probe.png" tests/goldens/cube3d || echo "probe$probe failed"
             done
             # OFFICIAL cube-sapp sample adaptation (verbatim pipeline/frame)
-            if [ "$RUNNER_OS" = "Windows" ]; then CDIAG=build/Release/cube_diag.exe; else CDIAG=build/cube_diag; fi
+            if [ "$RUNNER_OS" = "Windows" ]; then CDIAG=build/tests/Release/cube_diag.exe; else CDIAG=build/tests/cube_diag; fi
             "$CDIAG" "diag/cube_diag-$RUNNER_OS.png" || echo "cube_diag failed"
             IFS=_ read nocull noremap nodepth noib posonly u16 <<< "$combo"
             tag="cul${nocull}_rem${noremap}_dep${nodepth}_ib${noib}_po${posonly}_u16${u16}"
