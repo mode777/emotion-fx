@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.21)
-project(emotionfx C)
+project(emotionfx C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(APPLE)
     set(CMAKE_C_EXTENSIONS ON)
 else()
@@ -55,6 +57,24 @@ if(NOT MSVC)
     target_compile_definitions(efx_core PRIVATE _POSIX_C_SOURCE=200809L)
 endif()
 
+add_library(efx_math STATIC
+    src/math/efx_math.cpp
+)
+target_include_directories(efx_math PUBLIC src)
+target_include_directories(efx_math SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
+if(MSVC)
+    # GLM headers are not /W4-clean; the wrapper TU itself is
+    target_compile_options(efx_math PRIVATE /W3)
+else()
+    target_compile_options(efx_math PRIVATE -Wall -Wextra -Werror)
+endif()
+
+# headless developer builds: unit-test targets only — no sokol platform,
+# player, or golden tests (the display-required targets need X11/GL on
+# UNIX); the full build matrix is the verification server's and CI's job
+option(EFX_HEADLESS "Build headless unit-test targets only" OFF)
+
+if(NOT EFX_HEADLESS)
 add_library(efx_platform STATIC
     src/platform/platform.c
     src/platform/pipeline.c
@@ -62,6 +82,7 @@ add_library(efx_platform STATIC
 )
 target_include_directories(efx_platform PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR}/vendor/sokol
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(efx_platform PUBLIC efx_math)
 if(MSVC)
     target_compile_options(efx_platform PRIVATE /W4)
 elseif(NOT EMSCRIPTEN)
@@ -153,23 +174,45 @@ elseif(UNIX)
         ${EFX_X11_LIBRARY} ${EFX_XI_LIBRARY} ${EFX_XCURSOR_LIBRARY}
         ${EFX_GL_LIBRARY} m)
 endif()
+endif() # NOT EFX_HEADLESS
 
 option(EFX_BUILD_DEV_HARNESS "Build the temporary dev harness (F1 implementation aid)" OFF)
 
-# regenerate shaders/quad.h when the pinned sokol-shdc binary is provided:
+# regenerate shaders/quad.h + shaders/mesh.h when the pinned sokol-shdc
+# binary is provided:
 #   cmake -B build -DEFX_SHDC=/path/to/sokol-shdc ...
-set(EFX_SHDC "" CACHE FILEPATH "Path to the pinned sokol-shdc binary (regenerates shaders/quad.h)")
+set(EFX_SHDC "" CACHE FILEPATH "Path to the pinned sokol-shdc binary (regenerates shaders/quad.h and shaders/mesh.h)")
 if(EFX_SHDC)
     add_custom_target(regen_shaders
         COMMAND ${EFX_SHDC} -i ${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.glsl
                 -o ${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.h
                 --slang glsl410:glsl300es:hlsl4:metal_macos -f sokol_impl
+        COMMAND ${EFX_SHDC} -i ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh.glsl
+                -o ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh.h
+                --slang glsl410:glsl300es:hlsl4:metal_macos -f sokol_impl
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/shaders/quad.glsl
-        COMMENT "Regenerating shaders/quad.h via sokol-shdc")
+                ${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh.glsl
+        COMMENT "Regenerating shaders/quad.h and shaders/mesh.h via sokol-shdc")
 endif()
 
 enable_testing()
 add_subdirectory(tests)
+
+# headless math wrapper tests (GLM behind the plain C API, ADR 0005)
+add_executable(efx_math_tests
+    src/math/efx_math.cpp
+    tests/unit/math_tests.c
+)
+target_include_directories(efx_math_tests PRIVATE src)
+target_include_directories(efx_math_tests SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
+if(UNIX)
+    target_link_libraries(efx_math_tests PRIVATE m)
+endif()
+if(MSVC)
+    target_compile_options(efx_math_tests PRIVATE /W3)
+else()
+    target_compile_options(efx_math_tests PRIVATE -Wall -Wextra -Werror)
+endif()
 
 # headless display-list unit tests (ADR 0019 record/assert gate)
 add_executable(efx_render_tests

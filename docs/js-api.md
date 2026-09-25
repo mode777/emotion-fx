@@ -1,9 +1,10 @@
 # EmotionFX JavaScript API Reference
 
-**Status:** F1 (including explicit lifecycle hook registration) and F2 are
-implemented (current behavior). Everything from F3 onward is a provisional
-contract — names and signatures may be reshaped by the change that delivers
-them (every API change must update this document in the same change). See
+**Status:** F1 (including explicit lifecycle hook registration), F2, and
+F3 are implemented (current behavior). Everything from F4 onward is a
+provisional contract — names and signatures may be reshaped by the change
+that delivers them (every API change must update this document in the same
+change). See
 `vision.md` for product goals and `openspec/specs/feature-roadmap` for the
 milestone ladder.
 
@@ -54,7 +55,7 @@ Every rule below traces to vision.md or to F1's implemented behavior.
   model](#resource--memory-model)); `res.destroy()` releases
   deterministically and GC is the backstop. Native-backed classes are
   otherwise fully opaque except for documented read-only query properties —
-  the first are Texture's `width`/`height`.
+  Texture's `width`/`height` and MeshData's/Mesh's `surfaceCount`.
 - **Parameters**: hot immediate-mode calls take scalar arguments first
   (`drawQuad(x, y, texture, opts?)`); configuration beyond ~3 values
   goes in a trailing option object. Optionality is explicit at two levels:
@@ -127,7 +128,8 @@ one way — the rule that keeps a GC'd language from leaking unmanaged memory
 (vision.md). Five dynamic-count resource types are opaque **native-backed
 classes**; only the fixed light bank is slot-based (model: ADR 0011,
 memory discipline: ADR 0012, glTF data model: ADR 0014, implicit rig
-payload + `skinned` flag: ADR 0017, all under `docs/decisions/`).
+payload + `skinned` flag: ADR 0017, multi-surface mesh data model +
+per-surface materials: ADR 0024 — all under `docs/decisions/`).
 
 | Class | Meaning | Release path |
 |---|---|---|
@@ -137,12 +139,12 @@ payload + `skinned` flag: ADR 0017, all under `docs/decisions/`).
 
 | Resource | Contents | Class | Side | Delivered | Notes |
 |---|---|---|---|---|---|
-| MeshData | Attributes + indices; skinned meshes add `joints`/`weights` vertex attributes (glTF-style) | Native class | CPU | F3 | `createMeshData` / `loadMeshData` (F6) |
+| MeshData | 1..16 surfaces, each with its own attribute arrays + optional indices (Godot surface / glTF primitive; ADR 0024); skinned meshes add `joints`/`weights` per surface (F7, glTF-style) | Native class | CPU | F3 | `createMeshData` / `loadMeshData` (F6); read-only `surfaceCount` |
 | ImageData | Raw pixels + size + format | Native class | CPU | F2 | `createImageData` / `loadImage` (F6) |
-| Mesh | GPU mesh; skinned meshes carry skin, skeleton, and clips internally (ADR 0017) | Native class | GPU | F3 | `createMesh(meshData)` / `loadMesh`; `mesh.destroy()` |
+| Mesh | GPU mesh (all surfaces uploaded); skinned meshes carry skin, skeleton, and clips internally (ADR 0017); per-surface material binding slot (inert until F4) | Native class | GPU | F3 | `createMesh(meshData)` / `loadMesh`; `mesh.destroy()`; read-only `surfaceCount` |
 | Texture | GPU texture | Native class | GPU | F2 | `createTexture(imageData)`; `tex.destroy()`; read-only `tex.width` / `tex.height` (texture pixels; throw `TypeError` when destroyed); `efx.whiteTexture` is an engine-owned instance (destroy throws) |
 | RenderTarget | GPU render target | Native class | GPU | F5 | `createRenderTarget`; `rt.destroy()` |
-| Materials (Phong parameter objects) | — | JS-managed | — | F4 | Passed to `efx.setMaterial` |
+| Materials (Phong parameter objects) | — | JS-managed | — | F4 | Bound per surface via `efx.setMeshSurfaceMaterial` (ADR 0024) |
 | Fonts (atlas + quad layout) | — | JS-managed | — | F8 | Pure JS over Texture; passed to `drawText` |
 | Lights | — | Slot-based | — | F4 | 4 point slots + 1 directional (fixed) |
 
@@ -165,7 +167,8 @@ payload + `skinned` flag: ADR 0017, all under `docs/decisions/`).
 |---|---|
 | Point lights | 4 |
 | Directional lights | 1 |
-| Cameras | 1 (the active camera is set, never created) |
+| Cameras | 1 3D camera (set, never created); the F2 2D projection frame is a separate projection state |
+| Surfaces per mesh | 16 |
 
 ## API catalog
 
@@ -256,8 +259,10 @@ Scope from roadmap F2: `drawQuad`, ortho camera, texture slots, blending
 modes, display list (record → playback); golden-image harness first-class
 (ADR 0020).
 
-All 2D drawing happens inside a **virtual pixel frame** established by the
-one camera. Coordinates are frame pixels, origin at the **top-left**,
+All 2D drawing happens inside a **virtual pixel frame** established by
+`setCamera2D` — a projection state of its own; 3D drawing (F3) has its own
+camera and the two never mix. Coordinates are frame pixels, origin at the
+**top-left**,
 y pointing **down**, angles in degrees measured clockwise.
 
 ```js
@@ -345,43 +350,88 @@ function render() { // global hook (or efx.registerRenderHook(fn))
 }
 ```
 
-### F3 — 3D core (provisional)
+### F3 — 3D core (current)
 
 Scope from roadmap F3: camera, mesh slots, `drawMesh`, matrix math, depth
-test, vertex colors, procedural primitives.
+test, vertex colors, procedural primitives. The mesh data model is
+**multi-surface, Godot-style** (ADR 0024): a mesh holds 1..16 surfaces,
+each with its own attribute arrays and — from F4 — its own material.
 
 ```js
-// F3 · C · provisional
-efx.setCamera3D(opts)      // { pos, target, fov } — fov in degrees; the one camera
-efx.createMeshData(data)   // → MeshData; data: { positions, normals?, uvs?, colors? }
-efx.createMesh(meshData)   // → Mesh; uploads CPU → GPU
-efx.drawMesh(opts)         // { mesh, transform?, color? } — depth-tested; vertex colors used when present
+// F3 · C · current — desktop binding `C · quickjs`, web binding `C · bridge`;
+// identical semantics
+efx.setCamera3D(opts)      // { pos, target, fov, near? = 0.1, far? = 100 }
+                           // fov: vertical, degrees; up is +Y; the one 3D camera
+efx.createMeshData(data)   // → MeshData; multi-surface, below
+efx.createMesh(meshData)   // → Mesh; uploads ALL surfaces CPU → GPU
+efx.drawMesh(opts)         // { mesh, transform?, color? } — whole mesh, depth-tested
 ```
 
-- `MeshData` and `Mesh` are fully opaque for now (`destroy()` only).
-  Skinned meshes extend MeshData with `joints`/`weights` vertex attributes
-  in F7 (glTF-style).
+- `setCamera3D` is a projection state **separate from the 2D frame**:
+  3D draws use it; 2D draws keep the `setCamera2D` state (F2 behavior and
+  goldens are unchanged). Like all recorded state, the camera is
+  value-snapshotted at record time.
+- **MeshData** construction — batch form `{ surfaces: [surface, ...] }`
+  (1..16 entries) or single-surface shorthand
+  `{ positions, normals?, uvs?, colors?, indices? }`; passing both forms
+  throws `TypeError`. Each surface is one Godot surface / glTF primitive:
+  - `positions` — required flat xyz (array or typed array),
+  - `normals?` / `uvs?` / `colors?` — flat arrays matching the vertex
+    count (×3 / ×2 / ×4),
+  - `indices?` — triangle list of integers `< vertexCount`; omitted =
+    non-indexed (vertex count then divisible by 3).
+  Element rules: non-number → `TypeError`, non-finite → `RangeError`;
+  count/length/range problems → `RangeError`; unknown fields →
+  `TypeError`. A `materials` array (creation-time surface bindings)
+  arrives with F4 and is an unknown field until then. Read-only query
+  property `surfaceCount`; native byte cost counts toward GC pressure
+  (ADR 0012).
+- **Mesh** is a copy: `createMesh` uploads every surface to the GPU, and
+  the source MeshData can be destroyed afterwards. Read-only query
+  property `surfaceCount`. Opaque native-backed class (ADR 0011/0013):
+  `destroy()` releases deterministically, is idempotent, and use after
+  destroy throws. Each surface carries a material binding slot — inert
+  until F4, filled at creation from F4's `materials` array, rebindable
+  from F4 via `setMeshSurfaceMaterial`; an unbound surface renders with
+  the engine default material.
+- **`drawMesh({ mesh, transform?, color? })`** draws the whole mesh:
+  every surface in surface order under the recorded camera, depth-tested
+  against earlier 3D records (equal depth resolves by record order).
+  `transform` is a flat column-major 16-number array (default identity;
+  wrong length → `RangeError`), `color` a tint multiplying vertex colors
+  (default opaque white). No single-surface draw — split the mesh. F3's
+  canned fill is unlit (F4 lights it); surface `uvs` are validated and
+  stored but affect rendering only from F4b's maps. 2D records are
+  untouched by mesh depth (painter's order, no depth write).
 
 ```js
-// F3 · JS · provisional — pure-JS math helpers, engine-bundled
+// F3 · JS · current — pure-JS math helpers, engine-bundled (one source on
+// both bindings); plain JS data in/out, degrees, column-major float[16];
+// every helper is pure (inputs are never mutated)
 efx.mat4.identity()  efx.mat4.perspective(fovY, aspect, near, far)
-efx.mat4.ortho(...)  efx.mat4.translate(m, v)   efx.mat4.rotate(m, deg, axis)
-efx.mat4.scale(m, v) efx.mat4.multiply(a, b)
+efx.mat4.ortho(w, h, near, far)  efx.mat4.translate(m, v)
+efx.mat4.rotate(m, deg, axis)    efx.mat4.scale(m, v)
+efx.mat4.multiply(a, b)          // a·b (b applies to the vector first)
 efx.vec3.add(a, b)   efx.vec3.sub(a, b)  efx.vec3.scale(v, s)
 efx.vec3.normalize(v) efx.vec3.cross(a, b) efx.vec3.dot(a, b)
-efx.quat.*  // quaternion helpers, delivered with F3 math, consumed by F7
+efx.quat.identity() efx.quat.fromAxisAngle(deg, axis)
+efx.quat.multiply(a, b) efx.quat.toMat4(q)  // consumed by F7
 ```
 
 ```js
-// F3 · JS · provisional — procedural primitives producing mesh data for createMesh
-efx.makeCube(opts?)   // { size }
-efx.makePlane(opts?)  // { size, segments? }
-efx.makeSphere(opts?) // { radius, segments? }
+// F3 · JS · current — procedural primitives producing single-surface
+// MeshData (pinned layouts: cube 24 verts / 36 indices with per-face
+// normals + 0..1 uvs; plane on XZ facing +Y, (segments+1)^2 grid; UV
+// sphere with normals = normalized positions and equirectangular uvs)
+efx.makeCube(opts?)     // { size? = 1 }
+efx.makePlane(opts?)    // { size? = 1, segments? = 1 }
+efx.makeSphere(opts?)   // { radius? = 1, segments? = 16 }
+// size/radius: finite > 0; segments: positive integer; unknown fields throw
 ```
 
 ```js
-// main.js — F3 sample (provisional API)
-const cube = efx.createMesh(efx.createMeshData(efx.makeCube({ size: 1 })));
+// main.js — F3 sample (current API)
+const cube = efx.createMesh(efx.makeCube({ size: 1 }));
 efx.setClearColor([0.08, 0.09, 0.12, 1]);
 efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });
 
@@ -407,13 +457,17 @@ per-channel maps + alpha masks (F4b).
 // F4a · C · provisional
 efx.setLight(slot, opts)         // slot 0..3 — point light { pos, color, range? }
 efx.setDirectionalLight(opts)    // { dir, color } — the single directional light
-efx.setMaterial(mat)             // Phong channels; omitted channels take defaults:
+// Materials bind to SURFACES — there is no global material state (ADR 0024):
+efx.setMeshSurfaceMaterial(mesh, surfaceIndex, mat)
+// mat: Phong channels; omitted channels take defaults:
 // {
 //   ambient:  { color },             // default: black
 //   diffuse:  { color },             // default: white
 //   specular: { color, shininess? }, // default: black (shininess 32)
 //   emissive: { color },             // default: black
 // }
+// surfaces without a bound material render with the engine default material
+// (white diffuse Phong, no maps)
 ```
 
 ```js
@@ -427,17 +481,20 @@ efx.setMaterial(mat)             // Phong channels; omitted channels take defaul
 // }
 ```
 
-- `mat` is a **JS-managed** object; the engine reads it at `setMaterial`
-  time. Re-calling `setMaterial` with a different object switches materials.
+- `mat` is a **JS-managed** object; the engine reads (snapshots) it at
+  `setMeshSurfaceMaterial` time. Re-calling with a different object switches
+  that surface's material. `createMeshData` also accepts a parallel
+  `materials` array from F4: `materials[i]` (or `null` for the default)
+  becomes surface `i`'s initial binding, carried over at `createMesh`.
 
 ```js
 // main.js — F4 sample (provisional API)
-const ball = efx.createMesh(efx.createMeshData(efx.makeSphere({ radius: 1, segments: 24 })));
+const ball = efx.createMesh(efx.makeSphere({ radius: 1, segments: 24 }));
 efx.setClearColor([0.05, 0.05, 0.08, 1]);
 efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });
 efx.setLight(0, { pos: [3, 4, 2], color: [1, 0.95, 0.9, 1], range: 20 });
 efx.setDirectionalLight({ dir: [-0.5, -1, -0.3], color: [0.2, 0.25, 0.35, 1] });
-efx.setMaterial({
+efx.setMeshSurfaceMaterial(ball, 0, {
     ambient:  { color: [0.05, 0.05, 0.05, 1] },
     diffuse:  { color: [0.8, 0.3, 0.2, 1] },
     specular: { color: [1, 1, 1, 1], shininess: 32 },
@@ -495,8 +552,10 @@ interactive REPL. Paths are relative to the resource root
 // F6 · C · provisional — signatures final once the glTF profile is decided (F6)
 efx.loadText(path)        // → string
 efx.loadImage(path)       // → ImageData
-efx.loadMeshData(path)    // → MeshData
-efx.loadMesh(path)        // → Mesh — bundles skin, skeleton, and clips when the asset has them
+efx.loadMeshData(path)    // → MeshData — one surface per glTF mesh.primitives[i]
+efx.loadMesh(path)        // → Mesh — one surface per primitive, each primitive's
+                          //   material bound to its surface; skin, skeleton, and
+                          //   clips bundle into the Mesh when the asset has them
 
 // F6 · JS · provisional — convenience composition on the public C layer
 efx.loadTexture(path)     // → Texture (createTexture(loadImage(path)))
@@ -528,7 +587,8 @@ efx.poseMesh(mesh, pose)   // pose: { clip, time, weight? } or [ samples ]; CPU-
 efx.drawMesh({ mesh, transform?, color?, skinned? }) // skinned: true → current posed buffer
 ```
 
-- A skinned asset loads as one Mesh carrying its rig: skin weights,
+- Skin weights stay per-surface vertex attributes (`joints`/`weights`,
+  glTF `JOINTS_0`/`WEIGHTS_0`); a skinned asset loads as one Mesh carrying its rig: skin weights,
   skeleton (joint hierarchy + inverse bind matrices, glTF-style), and
   animation clips. No rig resources and no playback state are exposed to
   scripts — the script owns the clock.
@@ -574,8 +634,9 @@ built only on the public `[C]` API above.
 ```js
 // F8 · JS · provisional
 efx.loadFont(path)                   // → font object (JS-managed: atlas Texture + quad layout)
-efx.drawModel(mesh, mat, opts?)      // { transform?, skinned? } — one-call model drawing
-                                     // over setMaterial + drawMesh
+efx.drawModel(mesh, mat?, opts?)     // { transform?, skinned? } — pure-JS convenience:
+                                     // binds mat to every surface lacking a bound
+                                     // material, then drawMesh (ADR 0024)
 efx.drawText(text, x, y, opts)       // { font, size?, color? } — text as quads
 ```
 
@@ -609,11 +670,11 @@ section (or an open question below):
 | Additive and subtractive blending modes | F2 (`setBlendMode`) |
 | 1 camera fixed | F2 `setCamera2D`, F3 `setCamera3D`, limits table |
 | Rendering meshes | F3 (`createMesh` / `drawMesh`) |
-| Vertex colours | F3 (mesh `colors?` attribute, `drawMesh` color) |
+| Vertex colours | F3 (per-surface `colors?` attribute, `drawMesh` tint) |
 | Matrix math | F3 (`efx.mat4` / `efx.vec3` / `efx.quat`) |
 | Procedural primitives | F3 (`makeCube` / `makePlane` / `makeSphere`) |
 | 4 point lights, 1 directional light | F4, limits table |
-| Phong material system, 4 channels + maps | F4a/F4b (`setMaterial`) |
+| Phong material system, 4 channels + maps | F4a/F4b (`setMeshSurfaceMaterial`) |
 | Alpha masks | F4b (`alphaMask`) |
 | Rendering to textures | F5 (render targets) |
 | Simple post processing (color filter, blur) | F5 (`setColorFilter` / `setBlur`) |

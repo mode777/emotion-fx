@@ -33,6 +33,8 @@ directory holds only what stays true after a change is archived.
 | [0021](0021-sokol-shdc-canned-shaders.md) | Accepted | Canned shaders come from sokol-shdc; one GLSL source, no hand-written per-backend flavors |
 | [0022](0022-quickjs-desktop-only.md) | Accepted | quickjs never ships to the browser; the browser's native JS engine is the web runtime behind the `src/web/` bridge |
 | [0023](0023-tag-triggered-ci-and-releases.md) | Accepted | CI runs on `v*` tags and manual dispatch only, and every run publishes four downloadable target archives (tag runs attach them to the release) |
+| [0024](0024-multi-surface-meshes.md) | Accepted | Meshes are multi-surface (Godot-style, 1..16); materials bind per surface; the global `setMaterial` never ships |
+| [0025](0025-engine-owned-clip-depth-remap.md) | Accepted | The engine folds the GL→0..1 clip-depth remap into the MVP at playback on `origin_top_left` backends; sokol normalizes depth state, not depth range, nor attachment formats |
 
 ## Adding a decision
 

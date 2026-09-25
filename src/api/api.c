@@ -184,8 +184,20 @@ typedef struct {
     int alive;
 } efxjs_imagedata;
 
+typedef struct {
+    efx_meshdata *md;
+    int alive;
+} efxjs_meshdata;
+
+typedef struct {
+    uint64_t handle;
+    int alive;
+} efxjs_mesh;
+
 static JSClassID texture_class_id;
 static JSClassID imagedata_class_id;
+static JSClassID meshdata_class_id;
+static JSClassID mesh_class_id;
 
 static void texture_finalizer(JSRuntime *rt, JSValue val) {
     (void)rt;
@@ -204,6 +216,26 @@ static void imagedata_finalizer(JSRuntime *rt, JSValue val) {
     if (d) {
         free(d->pixels);
         free(d);
+    }
+}
+
+static void meshdata_finalizer(JSRuntime *rt, JSValue val) {
+    (void)rt;
+    efxjs_meshdata *m = JS_GetOpaque(val, meshdata_class_id);
+    if (m) {
+        efx_meshdata_destroy(m->md);
+        free(m);
+    }
+}
+
+static void mesh_finalizer(JSRuntime *rt, JSValue val) {
+    (void)rt;
+    efxjs_mesh *m = JS_GetOpaque(val, mesh_class_id);
+    if (m) {
+        if (m->alive) {
+            efx_render_mesh_destroy(m->handle);
+        }
+        free(m);
     }
 }
 
@@ -228,6 +260,25 @@ static JSValue js_destroy_resource(JSContext *ctx, JSValueConst this_val,
         d->alive = 0; /* native bytes released by the GC finalizer */
         return JS_UNDEFINED;
     }
+    efxjs_meshdata *md = JS_GetOpaque2(ctx, this_val, meshdata_class_id);
+    if (md) {
+        if (!md->alive) {
+            return JS_UNDEFINED;
+        }
+        md->alive = 0;
+        efx_meshdata_destroy(md->md);
+        md->md = NULL;
+        return JS_UNDEFINED;
+    }
+    efxjs_mesh *m = JS_GetOpaque2(ctx, this_val, mesh_class_id);
+    if (m) {
+        if (!m->alive) {
+            return JS_UNDEFINED;
+        }
+        m->alive = 0;
+        efx_render_mesh_destroy(m->handle);
+        return JS_UNDEFINED;
+    }
     return type_error(ctx, "not a resource object");
 }
 
@@ -238,6 +289,14 @@ static JSClassDef texture_class_def = {
 static JSClassDef imagedata_class_def = {
     "ImageData",
     .finalizer = imagedata_finalizer,
+};
+static JSClassDef meshdata_class_def = {
+    "MeshData",
+    .finalizer = meshdata_finalizer,
+};
+static JSClassDef mesh_class_def = {
+    "Mesh",
+    .finalizer = mesh_finalizer,
 };
 
 /* read-only query properties (Texture.width / Texture.height), resolved
@@ -273,6 +332,39 @@ static const JSCFunctionListEntry texture_proto_funcs[] = {
     JS_CGETSET_DEF("height", efx_js_texture_getHeight, NULL),
 };
 
+/* read-only query property surfaceCount (MeshData/Mesh, F3) */
+static JSValue efx_js_meshdata_getSurfaceCount(JSContext *ctx,
+                                               JSValueConst this_val) {
+    efxjs_meshdata *m = JS_GetOpaque2(ctx, this_val, meshdata_class_id);
+    if (!m) {
+        return type_error(ctx, "expected a MeshData");
+    }
+    if (!m->alive) {
+        return type_error(ctx, "using a destroyed resource");
+    }
+    return JS_NewInt32(ctx, m->md->surface_count);
+}
+
+static JSValue efx_js_mesh_getSurfaceCount(JSContext *ctx,
+                                           JSValueConst this_val) {
+    efxjs_mesh *m = JS_GetOpaque2(ctx, this_val, mesh_class_id);
+    if (!m) {
+        return type_error(ctx, "expected a Mesh");
+    }
+    if (!m->alive) {
+        return type_error(ctx, "using a destroyed resource");
+    }
+    return JS_NewInt32(ctx, efx_render_mesh_surface_count(m->handle));
+}
+
+static const JSCFunctionListEntry meshdata_proto_funcs[] = {
+    JS_CGETSET_DEF("surfaceCount", efx_js_meshdata_getSurfaceCount, NULL),
+};
+
+static const JSCFunctionListEntry mesh_proto_funcs[] = {
+    JS_CGETSET_DEF("surfaceCount", efx_js_mesh_getSurfaceCount, NULL),
+};
+
 int efx_api_init(JSContext *ctx) {
     static int registered;
     if (registered) {
@@ -280,23 +372,39 @@ int efx_api_init(JSContext *ctx) {
     }
     JSRuntime *rt = JS_GetRuntime(ctx);
     if (JS_NewClassID(rt, &texture_class_id) != texture_class_id ||
-        JS_NewClassID(rt, &imagedata_class_id) != imagedata_class_id) {
+        JS_NewClassID(rt, &imagedata_class_id) != imagedata_class_id ||
+        JS_NewClassID(rt, &meshdata_class_id) != meshdata_class_id ||
+        JS_NewClassID(rt, &mesh_class_id) != mesh_class_id) {
         return -1;
     }
     if (JS_NewClass(rt, texture_class_id, &texture_class_def) < 0 ||
-        JS_NewClass(rt, imagedata_class_id, &imagedata_class_def) < 0) {
+        JS_NewClass(rt, imagedata_class_id, &imagedata_class_def) < 0 ||
+        JS_NewClass(rt, meshdata_class_id, &meshdata_class_def) < 0 ||
+        JS_NewClass(rt, mesh_class_id, &mesh_class_def) < 0) {
         return -1;
     }
     JSValue tex_proto = JS_NewObject(ctx);
     JSValue img_proto = JS_NewObject(ctx);
+    JSValue md_proto = JS_NewObject(ctx);
+    JSValue mesh_proto = JS_NewObject(ctx);
     JSValue m = JS_NewCFunction(ctx, js_destroy_resource, "destroy", 0);
     JS_SetPropertyStr(ctx, tex_proto, "destroy", JS_DupValue(ctx, m));
-    JS_SetPropertyStr(ctx, img_proto, "destroy", m);
+    JS_SetPropertyStr(ctx, img_proto, "destroy", JS_DupValue(ctx, m));
+    JS_SetPropertyStr(ctx, md_proto, "destroy", JS_DupValue(ctx, m));
+    JS_SetPropertyStr(ctx, mesh_proto, "destroy", m);
     JS_SetPropertyFunctionList(ctx, tex_proto, texture_proto_funcs,
                                (int)(sizeof(texture_proto_funcs) /
                                      sizeof(texture_proto_funcs[0])));
+    JS_SetPropertyFunctionList(ctx, md_proto, meshdata_proto_funcs,
+                               (int)(sizeof(meshdata_proto_funcs) /
+                                     sizeof(meshdata_proto_funcs[0])));
+    JS_SetPropertyFunctionList(ctx, mesh_proto, mesh_proto_funcs,
+                               (int)(sizeof(mesh_proto_funcs) /
+                                     sizeof(mesh_proto_funcs[0])));
     JS_SetClassProto(ctx, texture_class_id, tex_proto);
     JS_SetClassProto(ctx, imagedata_class_id, img_proto);
+    JS_SetClassProto(ctx, meshdata_class_id, md_proto);
+    JS_SetClassProto(ctx, mesh_class_id, mesh_proto);
     registered = 1;
     return 0;
 }
@@ -774,5 +882,525 @@ JSValue efx_js_setBlendMode(JSContext *ctx, JSValueConst this_val, int argc, JSV
     }
     JS_FreeCString(ctx, s);
     efx_render_set_blend(mode);
+    return JS_UNDEFINED;
+}
+
+/* ------------------------------------------------------------ F3 bindings */
+
+/* read a flat number array (JS array or typed array; elements extracted by
+ * index so any typed array kind works). Element rules: non-number →
+ * TypeError, non-finite → RangeError (F2 precedent). Returns 0 on success. */
+static int read_number_array(JSContext *ctx, JSValueConst v, float **out,
+                             int *out_len, const char *what) {
+    int is_ta = JS_GetTypedArrayType(v);
+    if (!JS_IsArray(v) && is_ta < 0) {
+        type_error(ctx, what);
+        return -1;
+    }
+    JSValue lenv = JS_GetPropertyStr(ctx, v, "length");
+    int32_t len = -1;
+    JS_ToInt32(ctx, &len, lenv);
+    JS_FreeValue(ctx, lenv);
+    if (len < 0) {
+        range_error(ctx, what);
+        return -2;
+    }
+    float *buf = len ? malloc((size_t)len * sizeof(float)) : NULL;
+    if (len && !buf) {
+        generic_error(ctx, "out of memory");
+        return -3;
+    }
+    for (int32_t i = 0; i < len; i++) {
+        JSValue ev = JS_GetPropertyUint32(ctx, v, (uint32_t)i);
+        if (!JS_IsNumber(ev)) {
+            JS_FreeValue(ctx, ev);
+            free(buf);
+            type_error(ctx, "array elements must be numbers");
+            return -1;
+        }
+        double d = 0;
+        if (JS_ToFloat64(ctx, &d, ev) < 0) {
+            /* exception already pending on the context */
+            JS_FreeValue(ctx, ev);
+            free(buf);
+            return -4;
+        }
+        JS_FreeValue(ctx, ev);
+        if (!isfinite(d)) {
+            free(buf);
+            range_error(ctx, "array elements must be finite numbers");
+            return -2;
+        }
+        buf[i] = (float)d;
+    }
+    *out = buf;
+    *out_len = (int)len;
+    return 0;
+}
+
+/* indices: non-negative integers in uint32 range; non-integer → RangeError
+ * (the F2 pixel-bytes precedent) */
+static int read_index_array(JSContext *ctx, JSValueConst v, uint32_t **out,
+                            int *out_len) {
+    int is_ta = JS_GetTypedArrayType(v);
+    if (!JS_IsArray(v) && is_ta < 0) {
+        type_error(ctx, "indices must be an array");
+        return -1;
+    }
+    JSValue lenv = JS_GetPropertyStr(ctx, v, "length");
+    int32_t len = -1;
+    JS_ToInt32(ctx, &len, lenv);
+    JS_FreeValue(ctx, lenv);
+    if (len < 0) {
+        range_error(ctx, "indices");
+        return -2;
+    }
+    uint32_t *buf = len ? malloc((size_t)len * sizeof(uint32_t)) : NULL;
+    if (len && !buf) {
+        generic_error(ctx, "out of memory");
+        return -3;
+    }
+    for (int32_t i = 0; i < len; i++) {
+        JSValue ev = JS_GetPropertyUint32(ctx, v, (uint32_t)i);
+        double d = 0;
+        int bad = !JS_IsNumber(ev) || JS_ToFloat64(ctx, &d, ev) < 0;
+        JS_FreeValue(ctx, ev);
+        if (bad) {
+            free(buf);
+            type_error(ctx, "indices must be numbers");
+            return -1;
+        }
+        if (!isfinite(d) || d < 0 || d > 4294967295.0 || d != floor(d)) {
+            free(buf);
+            range_error(ctx, "indices must be integers in [0, 2^32-1]");
+            return -2;
+        }
+        buf[i] = (uint32_t)d;
+    }
+    *out = buf;
+    *out_len = (int)len;
+    return 0;
+}
+
+/* reject unknown fields on an object with a TypeError naming the field */
+static int check_known_fields(JSContext *ctx, JSValueConst obj,
+                              const char **known, int nknown,
+                              const char *where) {
+    JSPropertyEnum *props = NULL;
+    uint32_t nprops = 0;
+    if (JS_GetOwnPropertyNames(ctx, &props, &nprops, obj,
+                               JS_GPN_STRING_MASK) != 0) {
+        return -1;
+    }
+    int rc = 0;
+    for (uint32_t i = 0; i < nprops; i++) {
+        const char *k = JS_AtomToCString(ctx, props[i].atom);
+        int ok = 0;
+        for (int j = 0; j < nknown; j++) {
+            if (k && strcmp(k, known[j]) == 0) {
+                ok = 1;
+                break;
+            }
+        }
+        if (!ok) {
+            JS_ThrowTypeError(ctx, "unknown %s option '%s'", where,
+                              k ? k : "?");
+            rc = -1;
+        }
+        if (k) {
+            JS_FreeCString(ctx, k);
+        }
+        JS_FreeAtom(ctx, props[i].atom);
+        if (rc != 0) {
+            for (uint32_t j = i + 1; j < nprops; j++) {
+                JS_FreeAtom(ctx, props[j].atom);
+            }
+            break;
+        }
+    }
+    js_free(ctx, props);
+    return rc;
+}
+
+static const char *MD_KEYS[] = {"positions", "normals", "uvs",
+                                "colors", "indices"};
+
+/* buffers extracted from JS for one createMeshData call; every allocation
+ * is registered here the moment it exists so a single release path frees
+ * each exactly once on success and on every error exit */
+typedef struct {
+    float *f[EFX_MESH_MAX_SURFACES * 4];
+    uint32_t *i[EFX_MESH_MAX_SURFACES];
+    int nf, ni;
+} md_owned;
+
+static void md_owned_free(md_owned *o) {
+    for (int k = 0; k < o->nf; k++) {
+        free(o->f[k]);
+    }
+    for (int k = 0; k < o->ni; k++) {
+        free(o->i[k]);
+    }
+    o->nf = 0;
+    o->ni = 0;
+}
+
+/* extract one surface object into an efx_surface_src; buffers are owned
+ * by *own (the caller releases them, on success and on failure alike) */
+static int read_surface(JSContext *ctx, JSValueConst obj, efx_surface_src *s,
+                        md_owned *own) {
+    memset(s, 0, sizeof(*s));
+    if (!JS_IsObject(obj)) {
+        type_error(ctx, "surfaces must be objects");
+        return -1;
+    }
+    if (check_known_fields(ctx, obj, MD_KEYS, 5, "surface") != 0) {
+        return -1;
+    }
+    static const char *keys[] = {"positions", "normals", "uvs", "colors"};
+    float *bufs[4] = {NULL, NULL, NULL, NULL};
+    int lens[4] = {0, 0, 0, 0};
+    for (int i = 0; i < 4; i++) {
+        JSValue v = JS_GetPropertyStr(ctx, obj, keys[i]);
+        if (JS_IsUndefined(v)) {
+            JS_FreeValue(ctx, v);
+            continue;
+        }
+        int rc = read_number_array(ctx, v, &bufs[i], &lens[i], keys[i]);
+        JS_FreeValue(ctx, v);
+        if (rc != 0) {
+            return -1;
+        }
+        own->f[own->nf++] = bufs[i];
+    }
+    s->positions = bufs[0];
+    s->positions_len = lens[0];
+    s->normals = bufs[1];
+    s->normals_len = lens[1];
+    s->uvs = bufs[2];
+    s->uvs_len = lens[2];
+    s->colors = bufs[3];
+    s->colors_len = lens[3];
+    JSValue iv = JS_GetPropertyStr(ctx, obj, "indices");
+    if (!JS_IsUndefined(iv)) {
+        uint32_t *ibuf = NULL;
+        int ilen = 0;
+        int rc = read_index_array(ctx, iv, &ibuf, &ilen);
+        JS_FreeValue(ctx, iv);
+        if (rc != 0) {
+            return -1;
+        }
+        s->indices = ibuf;
+        s->indices_len = ilen;
+        own->i[own->ni++] = ibuf;
+    }
+    if (!s->positions) {
+        type_error(ctx, "surface requires positions");
+        return -1;
+    }
+    return 0;
+}
+
+JSValue efx_js_createMeshData(JSContext *ctx, JSValueConst this_val,
+                              int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsObject(argv[0])) {
+        return type_error(ctx, "createMeshData requires an options object");
+    }
+    JSValueConst opts = argv[0];
+    static const char *bag_keys[] = {"surfaces", "positions", "normals",
+                                     "uvs", "colors", "indices"};
+    if (check_known_fields(ctx, opts, bag_keys, 6, "createMeshData") != 0) {
+        return JS_EXCEPTION;
+    }
+
+    JSValue surfaces = JS_GetPropertyStr(ctx, opts, "surfaces");
+    JSValue positions = JS_GetPropertyStr(ctx, opts, "positions");
+    int has_surfaces = !JS_IsUndefined(surfaces);
+    int has_positions = !JS_IsUndefined(positions);
+    if (has_surfaces && has_positions) {
+        JS_FreeValue(ctx, surfaces);
+        JS_FreeValue(ctx, positions);
+        return type_error(ctx,
+                          "pass either surfaces or single-surface fields");
+    }
+    if (!has_surfaces && !has_positions) {
+        JS_FreeValue(ctx, surfaces);
+        JS_FreeValue(ctx, positions);
+        return type_error(ctx, "createMeshData requires surfaces");
+    }
+
+    efx_surface_src src[EFX_MESH_MAX_SURFACES];
+    md_owned own;
+    memset(&own, 0, sizeof(own));
+    int count = 0;
+
+    if (has_surfaces) {
+        if (!JS_IsArray(surfaces)) {
+            JS_FreeValue(ctx, surfaces);
+            JS_FreeValue(ctx, positions);
+            return type_error(ctx, "surfaces must be an array");
+        }
+        JSValue lenv = JS_GetPropertyStr(ctx, surfaces, "length");
+        int32_t len = -1;
+        JS_ToInt32(ctx, &len, lenv);
+        JS_FreeValue(ctx, lenv);
+        JS_FreeValue(ctx, positions);
+        if (len < 1 || len > EFX_MESH_MAX_SURFACES) {
+            JS_FreeValue(ctx, surfaces);
+            return range_error(ctx, "surfaces must hold 1..16 entries");
+        }
+        for (int32_t i = 0; i < len; i++) {
+            JSValue sv = JS_GetPropertyUint32(ctx, surfaces, (uint32_t)i);
+            int rc = read_surface(ctx, sv, &src[i], &own);
+            JS_FreeValue(ctx, sv);
+            if (rc != 0) {
+                JS_FreeValue(ctx, surfaces);
+                goto fail;
+            }
+            count++;
+        }
+        JS_FreeValue(ctx, surfaces);
+    } else {
+        JS_FreeValue(ctx, surfaces);
+        /* the bag itself is the single surface */
+        int rc = read_surface(ctx, opts, &src[0], &own);
+        JS_FreeValue(ctx, positions);
+        if (rc != 0) {
+            goto fail;
+        }
+        count = 1;
+    }
+
+    {
+        int err = 0;
+        efx_meshdata *md = efx_meshdata_create(src, count, &err);
+        md_owned_free(&own);
+        if (!md) {
+            if (err == EFX_MESHERR_COUNT || err == EFX_MESHERR_LEN ||
+                err == EFX_MESHERR_INDEX) {
+                return range_error(ctx, "invalid mesh data");
+            }
+            return generic_error(ctx, "out of memory");
+        }
+        efxjs_meshdata *wrap = calloc(1, sizeof(efxjs_meshdata));
+        if (!wrap) {
+            efx_meshdata_destroy(md);
+            return generic_error(ctx, "out of memory");
+        }
+        wrap->md = md;
+        wrap->alive = 1;
+        JSValue obj = JS_NewObjectClass(ctx, meshdata_class_id);
+        JS_SetOpaque(obj, wrap);
+        return obj;
+    }
+
+fail:
+    md_owned_free(&own);
+    return JS_EXCEPTION;
+}
+
+static efxjs_meshdata *get_live_meshdata(JSContext *ctx, JSValueConst v) {
+    efxjs_meshdata *m = JS_GetOpaque2(ctx, v, meshdata_class_id);
+    if (!m) {
+        type_error(ctx, "expected a MeshData");
+        return NULL;
+    }
+    if (!m->alive) {
+        type_error(ctx, "using a destroyed resource");
+        return NULL;
+    }
+    return m;
+}
+
+JSValue efx_js_createMesh(JSContext *ctx, JSValueConst this_val,
+                          int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1) {
+        return type_error(ctx, "createMesh requires a MeshData");
+    }
+    efxjs_meshdata *md = get_live_meshdata(ctx, argv[0]);
+    if (!md) {
+        return JS_EXCEPTION;
+    }
+    uint64_t handle = efx_render_mesh_create(md->md);
+    if (!handle) {
+        return generic_error(ctx, "mesh upload failed (no GPU context?)");
+    }
+    efxjs_mesh *m = calloc(1, sizeof(efxjs_mesh));
+    if (!m) {
+        efx_render_mesh_destroy(handle);
+        return generic_error(ctx, "out of memory");
+    }
+    m->handle = handle;
+    m->alive = 1;
+    JSValue obj = JS_NewObjectClass(ctx, mesh_class_id);
+    JS_SetOpaque(obj, m);
+    return obj;
+}
+
+static efxjs_mesh *get_live_mesh(JSContext *ctx, JSValueConst v) {
+    efxjs_mesh *m = JS_GetOpaque2(ctx, v, mesh_class_id);
+    if (!m) {
+        type_error(ctx, "expected a Mesh");
+        return NULL;
+    }
+    if (!m->alive) {
+        type_error(ctx, "using a destroyed resource");
+        return NULL;
+    }
+    return m;
+}
+
+JSValue efx_js_drawMesh(JSContext *ctx, JSValueConst this_val,
+                        int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsObject(argv[0])) {
+        return type_error(ctx, "drawMesh requires an options object");
+    }
+    JSValueConst opts = argv[0];
+    static const char *known[] = {"mesh", "transform", "color"};
+    if (check_known_fields(ctx, opts, known, 3, "drawMesh") != 0) {
+        return JS_EXCEPTION;
+    }
+    JSValue mv = JS_GetPropertyStr(ctx, opts, "mesh");
+    if (JS_IsUndefined(mv)) {
+        JS_FreeValue(ctx, mv);
+        return type_error(ctx, "drawMesh requires a mesh");
+    }
+    efxjs_mesh *mesh = get_live_mesh(ctx, mv);
+    JS_FreeValue(ctx, mv);
+    if (!mesh) {
+        return JS_EXCEPTION;
+    }
+
+    float transform[16];
+    int has_transform = 0;
+    JSValue tv = JS_GetPropertyStr(ctx, opts, "transform");
+    if (JS_IsUndefined(tv)) {
+        JS_FreeValue(ctx, tv);
+    } else {
+        float *buf = NULL;
+        int len = 0;
+        int rc = read_number_array(ctx, tv, &buf, &len, "transform");
+        JS_FreeValue(ctx, tv);
+        if (rc != 0) {
+            return JS_EXCEPTION;
+        }
+        if (len != 16) {
+            free(buf);
+            return range_error(ctx, "transform must hold 16 numbers");
+        }
+        memcpy(transform, buf, sizeof(transform));
+        free(buf);
+        has_transform = 1;
+    }
+
+    float color[4] = {1, 1, 1, 1};
+    JSValue cv = JS_GetPropertyStr(ctx, opts, "color");
+    if (JS_IsUndefined(cv)) {
+        JS_FreeValue(ctx, cv);
+    } else {
+        float *buf = NULL;
+        int len = 0;
+        int rc = read_number_array(ctx, cv, &buf, &len, "color");
+        JS_FreeValue(ctx, cv);
+        if (rc != 0) {
+            return JS_EXCEPTION;
+        }
+        if (len != 4) {
+            free(buf);
+            return range_error(ctx, "color must hold 4 numbers");
+        }
+        memcpy(color, buf, sizeof(color));
+        free(buf);
+    }
+
+    int rc = efx_render_mesh(mesh->handle, has_transform ? transform : NULL,
+                             color);
+    if (rc == EFX_RENDER_ERR_BUDGET) {
+        return range_error(ctx, "display list budget exceeded");
+    }
+    if (rc == EFX_RENDER_ERR_HANDLE) {
+        return type_error(ctx, "expected a live Mesh");
+    }
+    if (rc != EFX_RENDER_OK) {
+        return generic_error(ctx, "drawMesh failed");
+    }
+    return JS_UNDEFINED;
+}
+
+JSValue efx_js_setCamera3D(JSContext *ctx, JSValueConst this_val,
+                           int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsObject(argv[0])) {
+        return type_error(ctx, "setCamera3D requires an options object");
+    }
+    JSValueConst opts = argv[0];
+    static const char *known[] = {"pos", "target", "fov", "near", "far"};
+    if (check_known_fields(ctx, opts, known, 5, "setCamera3D") != 0) {
+        return JS_EXCEPTION;
+    }
+    efx_camera3d cam;
+    memset(&cam, 0, sizeof(cam));
+    cam.near_z = 0.1f;
+    cam.far_z = 100.0f;
+
+    static const char *vec_keys[] = {"pos", "target"};
+    float *vec_outs[] = {cam.pos, cam.target};
+    for (int i = 0; i < 2; i++) {
+        JSValue v = JS_GetPropertyStr(ctx, opts, vec_keys[i]);
+        if (JS_IsUndefined(v)) {
+            JS_FreeValue(ctx, v);
+            return type_error(ctx, "setCamera3D requires pos and target");
+        }
+        float *buf = NULL;
+        int len = 0;
+        int rc = read_number_array(ctx, v, &buf, &len, vec_keys[i]);
+        JS_FreeValue(ctx, v);
+        if (rc != 0) {
+            return JS_EXCEPTION;
+        }
+        if (len != 3) {
+            free(buf);
+            return range_error(ctx, "pos and target must hold 3 numbers");
+        }
+        memcpy(vec_outs[i], buf, sizeof(float) * 3);
+        free(buf);
+    }
+    JSValue fv = JS_GetPropertyStr(ctx, opts, "fov");
+    if (JS_IsUndefined(fv)) {
+        JS_FreeValue(ctx, fv);
+        return type_error(ctx, "setCamera3D requires fov");
+    }
+    double d = 0;
+    if (!JS_IsNumber(fv) || JS_ToFloat64(ctx, &d, fv) < 0) {
+        JS_FreeValue(ctx, fv);
+        return type_error(ctx, "fov must be a number");
+    }
+    JS_FreeValue(ctx, fv);
+    if (!isfinite(d)) {
+        return range_error(ctx, "fov must be finite");
+    }
+    cam.fov = (float)d;
+
+    static const char *opt_keys[] = {"near", "far"};
+    float *opt_outs[] = {&cam.near_z, &cam.far_z};
+    for (int i = 0; i < 2; i++) {
+        JSValue v = JS_GetPropertyStr(ctx, opts, opt_keys[i]);
+        if (!JS_IsUndefined(v)) {
+            if (!JS_IsNumber(v) || JS_ToFloat64(ctx, &d, v) < 0) {
+                JS_FreeValue(ctx, v);
+                return type_error(ctx, "near and far must be numbers");
+            }
+            if (!isfinite(d)) {
+                JS_FreeValue(ctx, v);
+                return range_error(ctx, "near and far must be finite");
+            }
+            *opt_outs[i] = (float)d;
+        }
+        JS_FreeValue(ctx, v);
+    }
+    efx_render_set_camera3d(&cam);
     return JS_UNDEFINED;
 }

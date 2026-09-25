@@ -67,8 +67,6 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     ID3D11Device *dev = (ID3D11Device *)env.d3d11.device;
     ID3D11DeviceContext *ctx = (ID3D11DeviceContext *)env.d3d11.device_context;
     IDXGISwapChain *sc = (IDXGISwapChain *)sapp_d3d11_get_swap_chain();
-    fprintf(stderr, "capture: dev=%p ctx=%p sc=%p\n", (void *)dev, (void *)ctx, (void *)sc);
-    fflush(stderr);
     if (!dev || !ctx || !sc) {
         return -1;
     }
@@ -162,7 +160,15 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     }
     [g_capture_tex getBytes:px bytesPerRow:(NSUInteger)w * 4
                  fromRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0];
-    /* MTLPixelFormatRGBA8Unorm: bytes are already RGBA, top-down */
+    /* MTLPixelFormatBGRA8Unorm: swizzle BGRA -> RGBA, top-down */
+    for (int y = 0; y < h; y++) {
+        uint8_t *row = px + (size_t)y * w * 4;
+        for (int x = 0; x < w; x++) {
+            uint8_t b = row[x * 4 + 0];
+            row[x * 4 + 0] = row[x * 4 + 2];
+            row[x * 4 + 2] = b;
+        }
+    }
     *out_pixels = px;
     *out_w = w;
     *out_h = h;

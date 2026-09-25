@@ -27,7 +27,7 @@ static void mock_destroy(void *ud, void *native) {
 }
 
 static const efx_render_sink g_sink = {
-    NULL, mock_create, mock_destroy, NULL, NULL,
+    NULL, mock_create, mock_destroy, NULL, NULL, NULL,
 };
 
 static efx_runtime *g_rt;
@@ -111,25 +111,25 @@ static int quad_record(void) {
     efx_camera2d cam = {640, 480, 320, 240, 2, 0};
     efx_affine expect = efx_affine_mul(efx_camera_matrix(&cam, 640, 480),
                                        efx_quad_matrix(0, 0, 32, 16, 90, 1.5f));
-    const efx_quad_record *r = efx_render_records(NULL);
-    if (!feq(r[0].m.a, expect.a) || !feq(r[0].m.tx, expect.tx) ||
-        !feq(r[0].m.ty, expect.ty)) {
+    const efx_record *r = efx_render_records(NULL);
+    if (!feq(r[0].u.quad.m.a, expect.a) || !feq(r[0].u.quad.m.tx, expect.tx) ||
+        !feq(r[0].u.quad.m.ty, expect.ty)) {
         end_js();
         return fail("composed transform mismatch");
     }
-    if (!feq(r[0].tw, 1) || !feq(r[0].sw, 1)) {
+    if (!feq(r[0].u.quad.tw, 1) || !feq(r[0].u.quad.sw, 1)) {
         end_js();
         return fail("source rect/texture size");
     }
-    if (!feq(r[0].w, 64) || !feq(r[0].h, 32)) {
+    if (!feq(r[0].u.quad.w, 64) || !feq(r[0].u.quad.h, 32)) {
         end_js();
         return fail("explicit size overrides derivation");
     }
-    if (!feq(r[0].color[0], 1) || !feq(r[0].color[1], 0) || !feq(r[0].color[3], 1)) {
+    if (!feq(r[0].u.quad.color[0], 1) || !feq(r[0].u.quad.color[1], 0) || !feq(r[0].u.quad.color[3], 1)) {
         end_js();
         return fail("tint");
     }
-    if (r[0].blend != EFX_BLEND_ALPHA) {
+    if (r[0].u.quad.blend != EFX_BLEND_ALPHA) {
         end_js();
         return fail("blend");
     }
@@ -151,25 +151,25 @@ static int size_derivation(void) {
         end_js();
         return fail("snippet");
     }
-    const efx_quad_record *r = efx_render_records(NULL);
+    const efx_record *r = efx_render_records(NULL);
     if (rec_count() != 4) {
         end_js();
         return fail("record count");
     }
-    if (!feq(r[0].w, 64) || !feq(r[0].h, 32)) {
+    if (!feq(r[0].u.quad.w, 64) || !feq(r[0].u.quad.h, 32)) {
         end_js();
         return fail("derive from texture pixels");
     }
-    if (!feq(r[1].w, 8) || !feq(r[1].h, 4)) {
+    if (!feq(r[1].u.quad.w, 8) || !feq(r[1].u.quad.h, 4)) {
         end_js();
         return fail("derive from sourceRect");
     }
-    if (!feq(r[2].w, 50) || !feq(r[2].h, 20)) {
+    if (!feq(r[2].u.quad.w, 50) || !feq(r[2].u.quad.h, 20)) {
         end_js();
         return fail("explicit size overrides sourceRect");
     }
     /* scale 2 around the (default center) pivot: matrix a-component = 2 */
-    if (!feq(r[3].w, 32) || !feq(r[3].h, 16) || !feq(r[3].m.a, 2)) {
+    if (!feq(r[3].u.quad.w, 32) || !feq(r[3].u.quad.h, 16) || !feq(r[3].u.quad.m.a, 2)) {
         end_js();
         return fail("scale applies after size");
     }
@@ -190,25 +190,25 @@ static int origin_pivot(void) {
         end_js();
         return fail("snippet");
     }
-    const efx_quad_record *r = efx_render_records(NULL);
+    const efx_record *r = efx_render_records(NULL);
     if (rec_count() != 3) {
         end_js();
         return fail("record count");
     }
     /* untransformed: origin must not move the quad */
-    if (!feq(r[0].m.tx, r[1].m.tx) || !feq(r[0].m.ty, r[1].m.ty) ||
-        !feq(r[0].m.a, r[1].m.a)) {
+    if (!feq(r[0].u.quad.m.tx, r[1].u.quad.m.tx) || !feq(r[0].u.quad.m.ty, r[1].u.quad.m.ty) ||
+        !feq(r[0].u.quad.m.a, r[1].u.quad.m.a)) {
         end_js();
         return fail("origin must not move an untransformed quad");
     }
     /* origin [0,0] + rotation 90 (y-down, clockwise): local (0,0) maps to
      * (10, 20) and local (64, 0) maps to (10, 20 + 64) */
-    if (!feq(r[2].m.a + r[2].m.c * 0 + r[2].m.tx, 10) ||
-        !feq(r[2].m.b * 0 + r[2].m.d * 0 + r[2].m.ty, 20)) {
+    if (!feq(r[2].u.quad.m.a + r[2].u.quad.m.c * 0 + r[2].u.quad.m.tx, 10) ||
+        !feq(r[2].u.quad.m.b * 0 + r[2].u.quad.m.d * 0 + r[2].u.quad.m.ty, 20)) {
         end_js();
         return fail("origin pivot corner position");
     }
-    if (!feq(r[2].m.a * 64 + r[2].m.tx, 10) || !feq(r[2].m.b * 64 + r[2].m.ty, 84)) {
+    if (!feq(r[2].u.quad.m.a * 64 + r[2].u.quad.m.tx, 10) || !feq(r[2].u.quad.m.b * 64 + r[2].u.quad.m.ty, 84)) {
         end_js();
         return fail("origin pivot rotation direction");
     }
@@ -278,14 +278,14 @@ static int camera_snapshot(void) {
         end_js();
         return fail("snippet");
     }
-    const efx_quad_record *r = efx_render_records(NULL);
-    if (r[0].m.tx == r[1].m.tx) {
+    const efx_record *r = efx_render_records(NULL);
+    if (r[0].u.quad.m.tx == r[1].u.quad.m.tx) {
         end_js();
         return fail("camera not snapshotted");
     }
     /* second view looks 50 world px right of the first: at zoom 1 the
        recorded quad shifts 50 frame px left (world moves right on screen) */
-    if (!feq(r[1].m.tx - r[0].m.tx, -50.0f)) {
+    if (!feq(r[1].u.quad.m.tx - r[0].u.quad.m.tx, -50.0f)) {
         end_js();
         return fail("camera delta");
     }
@@ -346,8 +346,8 @@ static int blend_snapshot(void) {
         end_js();
         return fail("snippet");
     }
-    const efx_quad_record *r = efx_render_records(NULL);
-    if (r[0].blend != EFX_BLEND_ALPHA || r[1].blend != EFX_BLEND_SUBTRACTIVE) {
+    const efx_record *r = efx_render_records(NULL);
+    if (r[0].u.quad.blend != EFX_BLEND_ALPHA || r[1].u.quad.blend != EFX_BLEND_SUBTRACTIVE) {
         end_js();
         return fail("blend snapshot");
     }
@@ -377,9 +377,9 @@ static int default_camera(void) {
         end_js();
         return fail("snippet");
     }
-    const efx_quad_record *r = efx_render_records(NULL);
-    if (r[0].frame_w != 1024 || r[0].frame_h != 600 || !feq(r[0].m.a, 1) ||
-        !feq(r[0].m.tx, 0) || !feq(r[0].m.ty, 0)) {
+    const efx_record *r = efx_render_records(NULL);
+    if (r[0].u.quad.frame_w != 1024 || r[0].u.quad.frame_h != 600 || !feq(r[0].u.quad.m.a, 1) ||
+        !feq(r[0].u.quad.m.tx, 0) || !feq(r[0].u.quad.m.ty, 0)) {
         end_js();
         return fail("default camera");
     }
@@ -440,6 +440,184 @@ static int hooks_registration(void) {
     return 0;
 }
 
+
+/* ------------------------------------------------------------------ F3 */
+
+/* createMeshData: batch + shorthand, surfaceCount, validation matrix */
+static int meshdata_js(void) {
+    const char *code =
+        "const P = [0,0,0, 1,0,0, 0,1,0];"
+        "const md = efx.createMeshData({"
+        "  surfaces: ["
+        "    { positions: P, normals: P, uvs: [0,0, 1,0, 0,1],"
+        "      colors: [1,0,0,1, 0,1,0,1, 0,0,1,1], indices: [0,1,2] },"
+        "    { positions: P },"
+        "  ],"
+        "});"
+        "if (md.surfaceCount !== 2) throw new Error('surfaceCount');"
+        "const one = efx.createMeshData({ positions: P, indices: [0,1,2] });"
+        "if (one.surfaceCount !== 1) throw new Error('shorthand');"
+        "function t(fn, kind) {"
+        "  try { fn(); throw new Error('did not throw'); }"
+        "  catch (e) {"
+        "    if (e instanceof Error && !(e instanceof TypeError) && !(e instanceof RangeError)) throw e;"
+        "    if (!(e instanceof kind)) throw new Error('wrong kind: ' + e);"
+        "  }"
+        "}"
+        "t(() => efx.createMeshData({}), TypeError);"
+        "t(() => efx.createMeshData({ surfaces: [], positions: P }), TypeError);"
+        "t(() => efx.createMeshData({ surfaces: [] }), RangeError);"
+        "t(() => efx.createMeshData({ positions: [0,0,0] }), RangeError);"
+        "t(() => efx.createMeshData({ positions: [0,0,0, 1,0,1] }), RangeError);"
+        "t(() => efx.createMeshData({ positions: P, indices: [0,1,3] }), RangeError);"
+        "t(() => efx.createMeshData({ positions: P, indices: [0,1] }), RangeError);"
+        "t(() => efx.createMeshData({ positions: P, frobnicate: 1 }), TypeError);"
+        "t(() => efx.createMeshData({ positions: P, materials: [] }), TypeError);"
+        "t(() => efx.createMeshData({ positions: ['a',0,0, 1,0,0, 0,1,0] }), TypeError);"
+        "t(() => efx.createMeshData({ positions: [NaN,0,0, 1,0,0, 0,1,0] }), RangeError);"
+        "t(() => efx.createMeshData({ positions: P, normals: [0,0,1] }), RangeError);"
+        "one.destroy();"
+        "try { one.surfaceCount; throw new Error('no'); }"
+        "catch (e) { if (!(e instanceof TypeError)) throw e; }";
+    if (ok_js(code)) {
+        end_js();
+        return fail("meshdata js");
+    }
+    end_js();
+    return 0;
+}
+
+/* 17 surfaces: RangeError cap */
+static int meshdata_cap_js(void) {
+    const char *code =
+        "const P = [0,0,0, 1,0,0, 0,1,0];"
+        "const S = [];"
+        "for (let i = 0; i < 17; i++) S.push({ positions: P, indices: [0,1,2] });"
+        "try { efx.createMeshData({ surfaces: S }); throw new Error('no'); }"
+        "catch (e) { if (!(e instanceof RangeError)) throw e; }"
+        "S.pop();"
+        "if (efx.createMeshData({ surfaces: S }).surfaceCount !== 16)"
+        "  throw new Error('16 must be accepted');";
+    if (ok_js(code)) {
+        end_js();
+        return fail("meshdata cap");
+    }
+    end_js();
+    return 0;
+}
+
+/* createMesh + drawMesh: upload, whole-mesh record, validation */
+static int mesh_js(void) {
+    const char *code =
+        "const P = [0,0,0, 1,0,0, 0,1,0];"
+        "const md = efx.createMeshData({ positions: P, indices: [0,1,2] });"
+        "const mesh = efx.createMesh(md);"
+        "if (mesh.surfaceCount !== 1) throw new Error('mesh surfaceCount');"
+        "md.destroy();" /* Mesh is a copy */
+        "if (mesh.surfaceCount !== 1) throw new Error('after source destroy');"
+        "efx.setCamera3D({ pos: [0, 2, 5], target: [0, 0, 0], fov: 60 });"
+        "efx.drawMesh({ mesh, transform: [1,0,0,0, 0,1,0,0, 0,0,1,0, 1,2,3,1],"
+        "  color: [0.5, 0.25, 1, 1] });"
+        "function t(fn, kind) {"
+        "  try { fn(); throw new Error('did not throw'); }"
+        "  catch (e) {"
+        "    if (e instanceof Error && !(e instanceof TypeError) && !(e instanceof RangeError)) throw e;"
+        "    if (!(e instanceof kind)) throw new Error('wrong kind: ' + e);"
+        "  }"
+        "}"
+        "t(() => efx.drawMesh({}), TypeError);"
+        "t(() => efx.drawMesh({ mesh: {} }), TypeError);"
+        "t(() => efx.drawMesh({ mesh, transform: [1,0,0,0, 0,1,0,0, 0,0,1,0, 1,2,3] }), RangeError);"
+        "t(() => efx.drawMesh({ mesh, transform: [1,0,0,0, 0,1,0,0, 0,0,1,0, 1,2,3,'x',1] }), TypeError);"
+        "t(() => efx.drawMesh({ mesh, color: [1, 0, 1] }), RangeError);"
+        "t(() => efx.drawMesh({ mesh, frobnicate: 1 }), TypeError);"
+        "const t2 = efx.createTexture("
+        "  efx.createImageData({ width: 2, height: 2, pixels: new Uint8Array(16) }));"
+        "t2.destroy();"
+        "efx.drawMesh({ mesh });"
+        "mesh.destroy(); mesh.destroy();" /* idempotent */
+        "t(() => efx.drawMesh({ mesh }), TypeError);"
+        "try { mesh.surfaceCount; throw new Error('no'); }"
+        "catch (e) { if (!(e instanceof TypeError)) throw e; }";
+    if (ok_js(code)) {
+        end_js();
+        return fail("mesh js");
+    }
+    /* records: first drawMesh with explicit args, throws record nothing,
+       second with defaults */
+    const efx_record *r = efx_render_records(NULL);
+    int n = rec_count();
+    if (n != 2) {
+        end_js();
+        return fail("mesh record count");
+    }
+    if (r[0].type != EFX_RECORD_MESH || r[1].type != EFX_RECORD_MESH) {
+        end_js();
+        return fail("mesh record type");
+    }
+    if (!feq(r[0].u.mesh.transform[12], 1) || !feq(r[0].u.mesh.transform[13], 2) ||
+        !feq(r[0].u.mesh.transform[14], 3)) {
+        end_js();
+        return fail("mesh transform");
+    }
+    if (!feq(r[0].u.mesh.color[1], 0.25f)) {
+        end_js();
+        return fail("mesh tint");
+    }
+    float pos[3], target[3], fov, nearz, farz;
+    efx_render_camera3d(pos, target, &fov, &nearz, &farz);
+    if (!feq(r[0].u.mesh.camera.pos[2], 5) || !feq(r[0].u.mesh.camera.fov, 60)) {
+        end_js();
+        return fail("mesh camera snapshot");
+    }
+    if (!feq(r[1].u.mesh.transform[0], 1) || !feq(r[1].u.mesh.transform[12], 0)) {
+        end_js();
+        return fail("mesh default identity");
+    }
+    if (!feq(r[1].u.mesh.color[3], 1)) {
+        end_js();
+        return fail("mesh default tint");
+    }
+    end_js();
+    return 0;
+}
+
+/* setCamera3D: defaults, validation, separate from the 2D camera */
+static int camera3d_js(void) {
+    const char *code =
+        "efx.setCamera3D({ pos: [0, 1, 4], target: [0, 0, 0], fov: 90 });"
+        "function t(fn, kind) {"
+        "  try { fn(); throw new Error('did not throw'); }"
+        "  catch (e) {"
+        "    if (e instanceof Error && !(e instanceof TypeError) && !(e instanceof RangeError)) throw e;"
+        "    if (!(e instanceof kind)) throw new Error('wrong kind: ' + e);"
+        "  }"
+        "}"
+        "t(() => efx.setCamera3D(), TypeError);"
+        "t(() => efx.setCamera3D({ target: [0,0,0], fov: 60 }), TypeError);"
+        "t(() => efx.setCamera3D({ pos: [0,0,0], target: [0,0,0], fov: 'wide' }), TypeError);"
+        "t(() => efx.setCamera3D({ pos: [0,0,0], target: [0,0,0], fov: 60, frobnicate: 1 }), TypeError);"
+        "efx.setCamera3D({ pos: [0, 0, 2], target: [0, 0, 0], fov: 45 });"
+        /* defaults accepted for near/far */
+        "efx.setCamera3D({ pos: [0, 0, 2], target: [0, 0, 0], fov: 45, near: 0.5, far: 50 });";
+    if (ok_js(code)) {
+        end_js();
+        return fail("camera3d js");
+    }
+    float pos[3], target[3], fov, nearz, farz;
+    efx_render_camera3d(pos, target, &fov, &nearz, &farz);
+    if (!feq(pos[2], 2) || !feq(fov, 45)) {
+        end_js();
+        return fail("camera3d state");
+    }
+    if (!feq(nearz, 0.5f) || !feq(farz, 50.0f)) {
+        end_js();
+        return fail("camera3d near/far");
+    }
+    end_js();
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: efx_api_tests <case>\n");
@@ -460,6 +638,10 @@ int main(int argc, char **argv) {
     if (!strcmp(c, "default_camera")) return default_camera();
     if (!strcmp(c, "clear_color_js")) return clear_color_js();
     if (!strcmp(c, "hooks_registration")) return hooks_registration();
+    if (!strcmp(c, "meshdata_js")) return meshdata_js();
+    if (!strcmp(c, "meshdata_cap_js")) return meshdata_cap_js();
+    if (!strcmp(c, "mesh_js")) return mesh_js();
+    if (!strcmp(c, "camera3d_js")) return camera3d_js();
     fprintf(stderr, "unknown case: %s\n", c);
     return 2;
 }

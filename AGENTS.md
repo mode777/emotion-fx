@@ -7,14 +7,17 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
 
 ## Current state
 
-- F1 (player skeleton) and F2 (2D layer) are **done** — the F2 gate is
-  verified green on the full four-target CI matrix (native 41/41 on
-  Windows/Linux/macOS with all six golden scenes, Emscripten 23/23, web
-  goldens all six scenes). The two follow-ups are archived too:
-  `f2a-sokol-shdc` (D3D11/Metal quads via generated canned shaders, ADR
-  0021) and `f2b-web-native-runtime` (the web player runs on the browser's
-  native JS engine through the `src/web/` bridge, with no quickjs in the
-  wasm, ADR 0022). The F2 change is archived at
+- F1 (player skeleton), F2 (2D layer), and F3 (3D core) are **done** — F3's
+  four-target gate is green (ci run 36122872839: native suites incl. all
+  twelve goldens on Linux/Windows/macOS, Emscripten ctest + web goldens)
+  after the D3D11/Metal clip-depth fix recorded in ADR 0025. F3 delivers
+  multi-surface meshes
+  (Godot-style, ADR 0024), `setCamera3D`, depth-tested `drawMesh`, the GLM
+  wrapper (`src/math`, ADR 0005), the shared pure-JS prelude (mat4/vec3/
+  quat + makeCube/makePlane/makeSphere), and per-surface material bindings
+  as the F4 contract (no global setMaterial). The F2 follow-ups are
+  archived: `f2a-sokol-shdc` (ADR 0021) and `f2b-web-native-runtime`
+  (ADR 0022); the F2 change is archived at
   `openspec/changes/archive/2026-09-22-f2-2d-layer`.
 - `src/` is a single core static library (`platform`, `runtime`, `api`,
   `player`, `render`) plus a thin `main.c` (ADR 0003). Sokol and
@@ -25,19 +28,35 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   and headless (`player --script <file> [args…]`, exit-code contract),
   plus a capture mode for golden images (`--capture-frame N
   --capture-output file`, ADR 0020).
+- `src/` gains two modules in F3: `src/math/` (GLM behind a plain C API,
+  ADR 0005 — the only C++ TUs) and `src/prelude/` (the engine-bundled
+  pure-JS layer — mat4/vec3/quat, procedural primitives — embedded from
+  one source via `tools/gen_prelude.py` and evaluated by both the desktop
+  runtime and the web bridge; `src/prelude/prelude.h` is committed and
+  the Linux gate job fails on drift via `gen_prelude.py --check`, so
+  regenerate after every `prelude.js` edit). Local headless iteration:
+  `cmake -B build -DEFX_HEADLESS=ON` builds the unit-test targets only
+  (no X11 needed); display-required builds run on the verification
+  server.
 - The script-facing API: F1's `efx.log`, `efx.quit`, `efx.args`, and
   lifecycle `efx.registerUpdateHook` / `efx.registerRenderHook` (stacking,
   `dt`, unsubscribe; global `update`/`render` remain load-time sugar), plus
   F2's 2D layer — `setCamera2D` (virtual frame), `drawQuad`, `setBlendMode`,
-  `setClearColor`, `createImageData`, `createTexture`, `whiteTexture`
-  — cataloged in `docs/js-api.md` (F1/F2 entries are current behavior).
+  `setClearColor`, `createImageData`, `createTexture`, `whiteTexture` —
+  and F3's 3D core — `setCamera3D`, multi-surface `createMeshData` /
+  `createMesh` / `drawMesh`, `efx.mat4`/`efx.vec3`/`efx.quat`,
+  `makeCube`/`makePlane`/`makeSphere` — cataloged in `docs/js-api.md`
+  (F1/F2/F3 entries are current behavior; materials bind per surface from
+  F4 — ADR 0024 — there is no global setMaterial).
 - Verification: ctest runs smoke + headless display-list/JS-API unit tests
   everywhere (on Emscripten the smoke suite runs the same portable scripts
   through the native bridge with the host JS engine as the runtime, plus
   `tools/run_web_compare.mjs` diffs desktop vs web output); golden-image
-  tests (7 committed scenes under `tests/goldens/`) run where a display
-  exists — Linux CI under `xvfb-run` + llvmpipe, Emscripten in pinned
-  headless Chrome (ADR 0020). Local builds without a display configure with
+  tests (13 committed scenes under `tests/goldens/` — seven 2D + six 3D;
+  `examples/browser/main.js`, the Pages gallery, cycles the same thirteen
+  through the public API and should gain a scene whenever a golden does)
+  run where a display exists — Linux CI under `xvfb-run` + llvmpipe,
+  Emscripten in pinned headless Chrome (ADR 0020). Local builds without a display configure with
   `-DEFX_BUILD_GOLDEN_TESTS=OFF` (the default); if a local build dir was
   configured with `ON`, exclude them (`ctest -E golden`) — goldens fail
   without a display.
@@ -117,7 +136,7 @@ implements.
 |---|-----------|------------------|-------------------|--------|
 | F1 | Player skeleton | CMake + vendored Sokol/QuickJS, window, resource root, `main.js` hooks, `--script` run mode | Builds on Win/Linux/macOS/Emscripten; script smoke test crosses the JS/C boundary and exits 0 on each | done |
 | F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | done — full four-target CI matrix green; `f2a` (shdc) + `f2b` (web runtime) archived, ADR 0021/0022 |
-| F3 | 3D core | Camera, mesh slots, `drawMesh`, matrix math, depth test, vertex colors, procedural primitives | Golden images + math unit tests | planned |
+| F3 | 3D core | Camera, multi-surface mesh resources (ADR 0024), `drawMesh` with depth test, GLM math wrapper, vertex colors, procedural primitives, pure-JS math layer | Golden images + math unit tests | done — four-target gate green (run 36122872839); ADR 0024/0025 |
 | F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); F4 lighting shaders reuse the sokol-shdc pipeline (strategy settled in F2, ADR 0021) | Golden images + lighting unit tests against a CPU reference implementation | planned |
 | F5 | Render targets + post FX | RTT, fullscreen-quad passes, color filter, blur | Golden images | planned |
 | F6 | Resource packaging | Zip resource root, glTF 2.0 asset import — meshes, images, skins, animation clips (profile decided here), interactive REPL | Script tests load assets from a zip; REPL exercised via piped stdin | planned |
@@ -138,6 +157,12 @@ settled — see `docs/decisions/`.
 - Fixed limits: 4 point lights + 1 directional light, 1 camera.
 - Immediate-mode *API*, but rendering goes through a re-orderable display list
   — do not map API calls 1:1 to draw calls.
+- **Sokol does not normalize the clip depth range or attachment formats**
+  (ADR 0025). Camera math is GL-convention; `src/platform/pipeline.c`
+  folds `row2 = 0.5·row2 + 0.5·row3` into the MVP on `origin_top_left`
+  backends (D3D11/Metal) — all four columns, never in shaders. Engine-
+  created attachments must declare the env-default pixel formats. "Only
+  GL renders correctly" plus half-missing meshes means check this first.
 - JS API layering: low/mid-level in C/C++ (`drawQuad`, `drawMesh`,
   `setMaterial`…), high-level conveniences in pure JS (`drawModel`,
   `drawText`…).

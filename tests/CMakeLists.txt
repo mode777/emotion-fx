@@ -1,6 +1,9 @@
 set(S ${CMAKE_CURRENT_SOURCE_DIR}/scripts)
 set(F ${CMAKE_CURRENT_SOURCE_DIR}/fixtures)
 
+# EFX_HEADLESS (root CMakeLists): no player target — register only the
+# headless unit-test cases at the bottom of this file
+if(NOT EFX_HEADLESS)
 function(add_player_test NAME)
     cmake_parse_arguments(ARG "" "EXPECT;EXPECT_OUT;EXPECT_ERR" "ARGS" ${ARGN})
     set(ARG_LINE "${ARG_ARGS}")
@@ -35,6 +38,8 @@ add_player_test(smoke_no_args EXPECT nonzero EXPECT_ERR "usage")
 add_player_test(smoke_unknown_option ARGS --frobnicate EXPECT nonzero EXPECT_ERR "unknown option")
 add_player_test(smoke_2d_validation ARGS "--script;${S}/s_2d_validation.js" EXPECT 0)
 add_player_test(smoke_resource_lifecycle ARGS "--script;${S}/s_resource_lifecycle.js" EXPECT 0)
+add_player_test(smoke_3d_validation ARGS "--script;${S}/s_3d_validation.js" EXPECT 0 EXPECT_OUT "s-3d-validation-ok")
+add_player_test(smoke_3d_math ARGS "--script;${S}/s_3d_math.js" EXPECT 0 EXPECT_OUT "s-3d-math-ok")
 endif()
 
 # web native-runtime tests (ADR 0022): the host JS engine (Node in this
@@ -84,9 +89,14 @@ if(EMSCRIPTEN)
     add_web_test(web_throw ${S}/s_throw.js EXPECT nonzero EXPECT_ERR "intentional-smoke-throw")
     add_web_test(web_2d_validation ${S}/s_2d_validation.js EXPECT 0)
     add_web_test(web_resource_lifecycle ${S}/s_resource_lifecycle.js EXPECT 0)
+    add_web_test(web_3d_validation ${S}/s_3d_validation.js EXPECT 0 EXPECT_OUT "s-3d-validation-ok")
+    add_web_test(web_3d_math ${S}/s_3d_math.js EXPECT 0 EXPECT_OUT "s-3d-math-ok")
 endif()
 
-# headless unit tests (display list + JS API against a mock GPU sink)
+endif() # NOT EFX_HEADLESS
+
+# headless unit tests (display list + JS API against a mock GPU sink;
+# always registered — their targets exist in EFX_HEADLESS builds too)
 function(add_unit_test TARGET CASE)
     if(EMSCRIPTEN)
         add_test(NAME ${TARGET}_${CASE}
@@ -97,15 +107,24 @@ function(add_unit_test TARGET CASE)
 endfunction()
 
 foreach(CASE
+    identity perspective_values ortho_values look_at_values mul_order
+    translate_rotate_scale vec3_ops mvp_compose)
+    add_unit_test(efx_math_tests ${CASE})
+endforeach()
+
+foreach(CASE
     compose_camera compose_quad value_snapshot default_camera_viewport
-    blend_snapshot record_budget texture_lifecycle record_fields batching)
+    blend_snapshot record_budget texture_lifecycle record_fields batching
+    meshdata_validation mesh_lifecycle mesh_pending_upload
+    mesh_record_fields mesh_record_order mesh_record_budget)
     add_unit_test(efx_render_tests ${CASE})
 endforeach()
 if(NOT EMSCRIPTEN)
 foreach(CASE
     white quad_record size_derivation origin_pivot quad_validation
     texture_size_getters camera_snapshot src_oob budget texture_lifecycle
-    blend_snapshot default_camera hooks_registration)
+    blend_snapshot default_camera hooks_registration meshdata_js
+    meshdata_cap_js mesh_js camera3d_js)
     add_unit_test(efx_api_tests ${CASE})
 endforeach()
 endif()
@@ -113,7 +132,7 @@ endif()
 # golden-image tests (require a GPU/display; enable in CI or locally with a
 # running window system) — Emscripten goldens run through the browser job
 option(EFX_BUILD_GOLDEN_TESTS "Build/run golden-image capture tests" OFF)
-if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN)
+if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN AND NOT EFX_HEADLESS)
     # embeds stb implementations -> relaxed warnings for this tool
     add_executable(efx_imgdiff imgdiff.c)
     target_include_directories(efx_imgdiff PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/stb)
@@ -128,7 +147,8 @@ if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN)
 
     # a scene's test activates once its golden image is committed (the
     # golden bootstrap produces them via the manual workflow job)
-    foreach(SCENE clear solid srcrect pivot blend camera origin)
+    foreach(SCENE clear solid srcrect pivot blend camera origin
+                cube3d vertcolor3d surfaces3d depth3d transform3d plane3d)
         if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/goldens/${SCENE}/golden.png)
             add_test(NAME golden_${SCENE}
                 COMMAND ${CMAKE_COMMAND}

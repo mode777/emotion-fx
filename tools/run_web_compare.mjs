@@ -39,6 +39,8 @@ const CASES = [
     { name: 'throw', script: 'tests/scripts/s_throw.js', args: [], stderrFirstLine: true },
     { name: '2d_validation', script: 'tests/scripts/s_2d_validation.js', args: [] },
     { name: 'resource_lifecycle', script: 'tests/scripts/s_resource_lifecycle.js', args: [] },
+    { name: '3d_validation', script: 'tests/scripts/s_3d_validation.js', args: [] },
+    { name: '3d_math', script: 'tests/scripts/s_3d_math.js', args: [] },
 ];
 
 function run(cmd, args) {

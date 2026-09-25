@@ -7,6 +7,7 @@
 
 #include "platform/platform.h"
 #include "render/render.h"
+#include "prelude/prelude.h"
 #include "web/web.h"
 
 #define EFX_WEB_ROOT_MAX 512
@@ -216,6 +217,206 @@ EMSCRIPTEN_KEEPALIVE int efx_bridge_draw_quad(double handle, float x, float y, f
     float src[4] = {sx, sy, sw, sh};
     return efx_render_quad(x, y, w, h, (uint64_t)handle, color, rotation, scale,
                            src, has_src, origin_x, origin_y);
+}
+
+/* ------------------------------------------------- F3 (3D core) */
+
+EMSCRIPTEN_KEEPALIVE const char *efx_bridge_js_prelude(void) {
+    return EFX_JS_PRELUDE; /* NUL-terminated; EFX_JS_PRELUDE_LEN bytes */
+}
+
+EMSCRIPTEN_KEEPALIVE void efx_bridge_set_camera3d(float px, float py, float pz,
+                                                  float tx, float ty, float tz,
+                                                  float fov, float near_z,
+                                                  float far_z) {
+    efx_camera3d cam;
+    memset(&cam, 0, sizeof(cam));
+    cam.pos[0] = px;
+    cam.pos[1] = py;
+    cam.pos[2] = pz;
+    cam.target[0] = tx;
+    cam.target[1] = ty;
+    cam.target[2] = tz;
+    cam.fov = fov;
+    cam.near_z = near_z;
+    cam.far_z = far_z;
+    efx_render_set_camera3d(&cam);
+}
+
+/* MeshData slot table (mirrors the desktop api.c wrapper ownership).
+   Surfaces arrive one at a time from JS: they are validated as a probe
+   MeshData, then their storage moves into the staging array; commit
+   assembles the final efx_meshdata. */
+typedef struct {
+    efx_surface *staged; /* surface_count entries; storage NULL until filled */
+    int filled;
+    efx_meshdata *md;    /* set by commit */
+    int alive;
+    int surface_count;
+} wmd_slot;
+
+static struct {
+    wmd_slot *slots;
+    int count, cap;
+} WMD;
+
+static wmd_slot *wmd_get(int id) {
+    if (id <= 0 || id > WMD.count) {
+        return NULL;
+    }
+    return &WMD.slots[id - 1];
+}
+
+static void wmd_release(wmd_slot *s) {
+    if (s->staged) {
+        for (int i = 0; i < s->surface_count; i++) {
+            efx_surface *sf = &s->staged[i];
+            free(sf->positions);
+            free(sf->normals);
+            free(sf->uvs);
+            free(sf->colors);
+            free(sf->indices);
+        }
+        free(s->staged);
+        s->staged = NULL;
+    }
+    efx_meshdata_destroy(s->md);
+    s->md = NULL;
+}
+
+EMSCRIPTEN_KEEPALIVE int efx_bridge_meshdata_create(int surface_count) {
+    if (surface_count < 1 || surface_count > EFX_MESH_MAX_SURFACES) {
+        return 0;
+    }
+    if (WMD.count >= WMD.cap) {
+        int cap = WMD.cap ? WMD.cap * 2 : 16;
+        wmd_slot *grown = realloc(WMD.slots, (size_t)cap * sizeof(wmd_slot));
+        if (!grown) {
+            return 0;
+        }
+        WMD.slots = grown;
+        WMD.cap = cap;
+    }
+    wmd_slot *s = &WMD.slots[WMD.count];
+    memset(s, 0, sizeof(*s));
+    s->staged = calloc((size_t)surface_count, sizeof(efx_surface));
+    if (!s->staged) {
+        return 0;
+    }
+    s->surface_count = surface_count;
+    s->alive = 1;
+    WMD.count++;
+    return WMD.count;
+}
+
+/* fill one staged surface; returns 0 ok, EFX_MESHERR_* on validation
+   failure (the staged MeshData is released; the JS layer throws) */
+EMSCRIPTEN_KEEPALIVE int efx_bridge_meshdata_surface(int id, int index,
+                                                     const float *positions,
+                                                     int positions_len,
+                                                     const float *normals,
+                                                     int normals_len,
+                                                     const float *uvs,
+                                                     int uvs_len,
+                                                     const float *colors,
+                                                     int colors_len,
+                                                     const uint32_t *indices,
+                                                     int indices_len) {
+    wmd_slot *s = wmd_get(id);
+    if (!s || !s->alive || index < 0 || index >= s->surface_count) {
+        return EFX_MESHERR_COUNT;
+    }
+    efx_surface_src src;
+    memset(&src, 0, sizeof(src));
+    src.positions = positions;
+    src.positions_len = positions_len;
+    src.normals = normals;
+    src.normals_len = normals_len;
+    src.uvs = uvs;
+    src.uvs_len = uvs_len;
+    src.colors = colors;
+    src.colors_len = colors_len;
+    src.indices = indices;
+    src.indices_len = indices_len;
+    int err = 0;
+    efx_meshdata *probe = efx_meshdata_create(&src, 1, &err);
+    if (!probe) {
+        wmd_release(s);
+        s->alive = 0;
+        return err;
+    }
+    /* transfer the validated surface storage into the staging slot */
+    s->staged[index] = probe->surfaces[0];
+    free(probe->surfaces);
+    free(probe);
+    s->filled++;
+    return EFX_MESHERR_OK;
+}
+
+EMSCRIPTEN_KEEPALIVE int efx_bridge_meshdata_surface_count(int id) {
+    wmd_slot *s = wmd_get(id);
+    if (!s || !s->alive || !s->md) {
+        return -1;
+    }
+    return s->md->surface_count;
+}
+
+/* assemble the final MeshData; returns 0 ok, EFX_MESHERR_* on failure */
+EMSCRIPTEN_KEEPALIVE int efx_bridge_meshdata_commit(int id) {
+    wmd_slot *s = wmd_get(id);
+    if (!s || !s->alive || !s->staged) {
+        return EFX_MESHERR_COUNT;
+    }
+    if (s->filled != s->surface_count) {
+        wmd_release(s);
+        s->alive = 0;
+        return EFX_MESHERR_LEN;
+    }
+    s->md = malloc(sizeof(efx_meshdata));
+    if (!s->md) {
+        wmd_release(s);
+        s->alive = 0;
+        return EFX_MESHERR_NOMEM;
+    }
+    s->md->surface_count = s->surface_count;
+    s->md->surfaces = s->staged;
+    s->staged = NULL; /* ownership moved into the meshdata */
+    return EFX_MESHERR_OK;
+}
+
+EMSCRIPTEN_KEEPALIVE void efx_bridge_meshdata_destroy(int id) {
+    wmd_slot *s = wmd_get(id);
+    if (!s || !s->alive) {
+        return;
+    }
+    s->alive = 0;
+    wmd_release(s);
+}
+
+EMSCRIPTEN_KEEPALIVE double efx_bridge_mesh_create(int id) {
+    wmd_slot *s = wmd_get(id);
+    if (!s || !s->alive || !s->md) {
+        return 0;
+    }
+    return (double)efx_render_mesh_create(s->md);
+}
+
+EMSCRIPTEN_KEEPALIVE void efx_bridge_mesh_destroy(double handle) {
+    efx_render_mesh_destroy((uint64_t)handle);
+}
+
+EMSCRIPTEN_KEEPALIVE int efx_bridge_mesh_alive(double handle) {
+    return efx_render_mesh_alive((uint64_t)handle);
+}
+
+EMSCRIPTEN_KEEPALIVE int efx_bridge_mesh_surface_count(double handle) {
+    return efx_render_mesh_surface_count((uint64_t)handle);
+}
+
+EMSCRIPTEN_KEEPALIVE int efx_bridge_draw_mesh(double handle,
+                                              const float *transform,
+                                              const float *color) {
+    return efx_render_mesh((uint64_t)handle, transform, color);
 }
 
 static int web_frame(void *ud, double dt) {
