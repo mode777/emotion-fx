@@ -21,6 +21,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Configure
         run: cmake -B build -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Patch sokol to log InputLayout HRESULT
+        shell: bash
+        run: |
+          sed -i 's/_SG_ERROR(D3D11_CREATE_INPUT_LAYOUT_FAILED);/_SG_ERROR(D3D11_CREATE_INPUT_LAYOUT_FAILED); { fprintf(stderr, "CIL hr=0x%08lX\\n", (unsigned long)hr); fflush(stderr); }/' vendor/sokol/sokol_gfx.h
+          grep -c "CIL hr" vendor/sokol/sokol_gfx.h
       - name: Build
         run: cmake --build build --config Release --target player -j4
       - name: Capture cube3d with stderr
