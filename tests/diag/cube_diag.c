@@ -18,7 +18,6 @@
 
 #include "sokol_gfx.h"
 #include "sokol_app.h"
-#include "sokol_log.h"
 #include "sokol_glue.h"
 #define VECMATH_GENERICS
 #include "vecmath.h"
@@ -29,6 +28,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+static void diag_slog(const char *tag, uint32_t level, uint32_t item,
+                      const char *message, uint32_t line_nr,
+                      const char *filename, void *ud) {
+    (void)item; (void)ud;
+    fprintf(stderr, "cube_diag[%s] %s:%u: %s\n", tag,
+            filename ? filename : "?", line_nr,
+            message ? message : "<no message>");
+}
 
 static struct {
     float rx, ry;
@@ -67,7 +75,7 @@ static void write_png(const uint8_t *px, int w, int h) {
 static void init(void) {
     sg_setup(&(sg_desc){
         .environment = sglue_environment(),
-        .logger.func = slog_func,
+        .logger.func = diag_slog,
     });
 
     // cube vertex buffer (verbatim from cube-sapp.c)
@@ -278,7 +286,7 @@ int main(int argc, char *argv[]) {
         .height = 480,
         .sample_count = 4,
         .window_title = "cube_diag (official cube-sapp adaptation)",
-        .logger.func = slog_func,
+        .logger.func = diag_slog,
     });
     return 0;
 }
