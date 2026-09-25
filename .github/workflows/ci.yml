@@ -44,7 +44,9 @@ jobs:
             done
             # OFFICIAL cube-sapp sample adaptation (verbatim pipeline/frame)
             if [ "$RUNNER_OS" = "Windows" ]; then CDIAG=build/tests/Release/cube_diag.exe; else CDIAG=build/tests/cube_diag; fi
-            "$CDIAG" "diag/cube_diag-$RUNNER_OS.png" || echo "cube_diag failed"
+            for variant in 0 1 2 3 4; do
+              CUBE_DIAG_VARIANT=$variant "$CDIAG" "diag/cube_diag-v$variant.png" || echo "v$variant failed"
+            done
             IFS=_ read nocull noremap nodepth noib posonly u16 <<< "$combo"
             tag="cul${nocull}_rem${noremap}_dep${nodepth}_ib${noib}_po${posonly}_u16${u16}"
             export EFX_DIAG_NOCULL=$nocull EFX_DIAG_NOREMAP=$noremap EFX_DIAG_NODEPTH=$nodepth EFX_DIAG_NOIB=$noib EFX_DIAG_POSONLY=$posonly EFX_DIAG_U16=$u16
