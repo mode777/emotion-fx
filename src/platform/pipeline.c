@@ -303,6 +303,7 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
                          mr->camera.near_z, mr->camera.far_z);
     efx_math_mul(pv, proj, view);
     efx_math_mul(mvp, pv, mr->transform);
+    fprintf(stderr, "DIAG play_mesh: native=%p surfaces=%d\n", m, m ? m->surface_count : -1); fflush(stderr);
     if (P.depth_remap) {
         /* row 2 of the clip matrix: z' = 0.5*z_clip + 0.5*w_clip maps the
            GL-style (-1..1) range onto the D3D11/Metal (0..1) range;

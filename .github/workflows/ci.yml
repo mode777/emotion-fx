@@ -11,6 +11,31 @@ env:
   EFX_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', github.sha) }}
 
 jobs:
+  diag-captures:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -B build -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --target player -j4
+      - name: Capture cube3d with stderr
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then P=build/Release/player.exe; else P=build/player; fi
+          "$P" --capture-frame 2 --capture-output diag-cube3d.png tests/goldens/cube3d 2>&1 | tee diag-stderr.txt
+          test -f diag-cube3d.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diag-${{ matrix.os }}
+          path: |
+            diag-cube3d.png
+            diag-stderr.txt
+
   native:
     name: build+test (${{ matrix.os }})
     strategy:
