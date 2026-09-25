@@ -79,6 +79,50 @@ static void write_png(const uint8_t *px, int w, int h) {
     fflush(stdout);
 }
 
+#if defined(SOKOL_METAL)
+static id<MTLTexture> diag_color_tex;   /* Managed, readback-able */
+static sg_image diag_color_img;
+static sg_view diag_color_view;
+static id<MTLTexture> diag_depth_tex;
+static sg_image diag_depth_img;
+static sg_view diag_depth_view;
+static sg_attachments diag_atts;
+static void diag_attachments_setup(id<MTLDevice> dev) {
+    MTLTextureDescriptor *cd = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                     width:640 height:480 mipmapped:NO];
+    cd.usage = MTLTextureUsageRenderTarget;
+    cd.storageMode = MTLStorageModeManaged;
+    id<MTLTexture> ctex = [dev newTextureWithDescriptor:cd];
+    diag_color_tex = ctex;
+    diag_color_img = sg_make_image(&(sg_image_desc){
+        .width = 640, .height = 480,
+        .pixel_format = SG_PIXELFORMAT_BGRA8,
+        .usage.color_attachment = true,
+        .mtl_textures[0] = (__bridge const void *)ctex,
+    });
+    diag_color_view = sg_make_view(&(sg_view_desc){
+        .color_attachment.image = diag_color_img});
+    MTLTextureDescriptor *dd = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                                     width:640 height:480 mipmapped:NO];
+    dd.usage = MTLTextureUsageRenderTarget;
+    dd.storageMode = MTLStorageModePrivate;
+    id<MTLTexture> dtex = [dev newTextureWithDescriptor:dd];
+    diag_depth_tex = dtex;
+    diag_depth_img = sg_make_image(&(sg_image_desc){
+        .width = 640, .height = 480,
+        .pixel_format = SG_PIXELFORMAT_DEPTH,
+        .usage.depth_stencil_attachment = true,
+        .mtl_textures[0] = (__bridge const void *)dtex,
+    });
+    diag_depth_view = sg_make_view(&(sg_view_desc){
+        .depth_stencil_attachment.image = diag_depth_img});
+    diag_atts.colors[0] = diag_color_view;
+    diag_atts.depth_stencil = diag_depth_view;
+}
+#endif
+
 static void init(void) {
     sg_setup(&(sg_desc){
         .environment = sglue_environment(),
@@ -166,51 +210,6 @@ static void init(void) {
     };
 }
 
-#if defined(SOKOL_METAL)
-static id<MTLTexture> diag_color_tex;   /* Managed, readback-able */
-static sg_image diag_color_img;
-static sg_view diag_color_view;
-static id<MTLTexture> diag_depth_tex;
-static sg_image diag_depth_img;
-static sg_view diag_depth_view;
-static sg_attachments diag_atts;
-static void diag_attachments_setup(id<MTLDevice> dev) {
-    MTLTextureDescriptor *cd = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
-                                     width:640 height:480 mipmapped:NO];
-    cd.usage = MTLTextureUsageRenderTarget;
-    cd.storageMode = MTLStorageModeManaged;
-    id<MTLTexture> ctex = [dev newTextureWithDescriptor:cd];
-    diag_color_tex = ctex;
-    diag_color_img = sg_make_image(&(sg_image_desc){
-        .width = 640, .height = 480,
-        .pixel_format = SG_PIXELFORMAT_BGRA8,
-        .usage.color_attachment = true,
-        .mtl_textures[0] = (__bridge const void *)ctex,
-    });
-    diag_color_view = sg_make_view(&(sg_view_desc){
-        .color_attachment.image = diag_color_img});
-    MTLTextureDescriptor *dd = [MTLTextureDescriptor
-        texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
-                                     width:640 height:480 mipmapped:NO];
-    dd.usage = MTLTextureUsageRenderTarget;
-    dd.storageMode = MTLStorageModePrivate;
-    id<MTLTexture> dtex = [dev newTextureWithDescriptor:dd];
-    diag_depth_tex = dtex;
-    diag_depth_img = sg_make_image(&(sg_image_desc){
-        .width = 640, .height = 480,
-        .pixel_format = SG_PIXELFORMAT_DEPTH,
-        .usage.depth_stencil_attachment = true,
-        .mtl_textures[0] = (__bridge const void *)dtex,
-    });
-    diag_depth_view = sg_make_view(&(sg_view_desc){
-        .depth_stencil_attachment.image = diag_depth_img});
-    sg_attachments_desc ad = {0};
-    ad.colors[0] = diag_color_view;
-    ad.depth_stencil = diag_depth_view;
-    diag_atts = sg_make_attachments(&ad);
-}
-#endif
 
 static void frame(void) {
     const float t = (float)(sapp_frame_duration() * 60.0);
