@@ -16,9 +16,11 @@
 #define SOKOL_GLCORE
 #endif
 
+#if defined(_WIN32)
 #include <initguid.h>
 #include <d3d11.h>
 #include <dxgi.h>
+#endif
 #include "sokol_gfx.h"
 #include "sokol_app.h"
 #include "sokol_glue.h"
@@ -27,8 +29,6 @@
 #define SOKOL_SHDC_IMPL
 #include "cube-sapp.h"
 
-#if defined(_WIN32)
-#endif
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
