@@ -23,7 +23,8 @@ only the translation column (`mvp[10] *= 0.5; mvp[14] = 0.5*mvp[14] +
 column never entered $z'$. Any vertex nearer than the model origin got
 $z' > w$ and was clipped by the far plane. sokol-samples never trip this
 because HandmadeMath's `HMM_Perspective_RH_ZO` builds a 0..1 projection
-outright. Full record: `openspec/changes/f3-3d-core/design.md` (Risks).
+outright. Full record: `openspec/changes/archive/2026-09-25-f3-3d-core/design.md`
+(Risks).
 
 ## Decision
 

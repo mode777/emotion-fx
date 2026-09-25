@@ -50,8 +50,9 @@ classified in the reference as exactly one of: JS-managed (plain script
 objects, garbage collected), native-backed class (an opaque JS object
 wrapping a native handle with an explicit `destroy()` release method; such a
 class MAY additionally expose documented read-only query properties, which
-MUST be listed in the reference — the first instance is Texture's `width` and
-`height`), or slot-based (a fixed pre-allocated bank of indexed resources).
+MUST be listed in the reference — the instances are Texture's `width` and
+`height`, and MeshData's and Mesh's read-only `surfaceCount` delivered by
+F3), or slot-based (a fixed pre-allocated bank of indexed resources).
 The native-backed classes SHALL be exactly: MeshData, ImageData, Mesh,
 Texture, and RenderTarget; skins, skeletons, and animation clips are
 implicit Mesh payload — loaded with the mesh and posed by the script
@@ -65,12 +66,12 @@ into GC pressure and MUST run collection at frame end, bounding
 unreferenced native waste to roughly one frame. Resources recorded into the
 display list MUST stay alive until playback completes. The reference SHALL
 document the engine's fixed limits: 4 point lights, 1 directional light,
-and 1 camera; lights are the only slot bank.
+1 camera, and 16 surfaces per mesh (F3); lights are the only slot bank.
 
 #### Scenario: Fixed limits stated
 - **WHEN** the reference document's limits section is read
-- **THEN** it states 4 point lights, 1 directional light, and 1 camera,
-  matching vision.md
+- **THEN** it states 4 point lights, 1 directional light, 1 camera, and
+  16 surfaces per mesh, matching vision.md and the 3d-core capability
 
 #### Scenario: Unreleased native resource is reclaimed
 - **WHEN** a script creates textures in a loop and never calls
@@ -86,9 +87,10 @@ and 1 camera; lights are the only slot bank.
   subsequent use of the destroyed resource throws
 
 #### Scenario: Query properties are documented per class
-- **WHEN** the reference document's Texture entry is read
-- **THEN** it lists the read-only `width` and `height` query properties, and
-  every other native-backed class entry states that it has none
+- **WHEN** the reference document's native-backed class entries are read
+- **THEN** the Texture entry lists the read-only `width` and `height`, the
+  MeshData and Mesh entries list the read-only `surfaceCount`, and every
+  other entry states that it has none
 
 #### Scenario: Resource without a classification
 - **WHEN** a change proposes exposing a new resource type to scripts without

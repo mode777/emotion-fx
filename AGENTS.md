@@ -15,7 +15,9 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   (Godot-style, ADR 0024), `setCamera3D`, depth-tested `drawMesh`, the GLM
   wrapper (`src/math`, ADR 0005), the shared pure-JS prelude (mat4/vec3/
   quat + makeCube/makePlane/makeSphere), and per-surface material bindings
-  as the F4 contract (no global setMaterial). The F2 follow-ups are
+  as the F4 contract (no global setMaterial). The F3 change is archived at
+  `openspec/changes/archive/2026-09-25-f3-3d-core` (specs synced:
+  `openspec/specs/3d-core`, `js-api`). The F2 follow-ups are
   archived: `f2a-sokol-shdc` (ADR 0021) and `f2b-web-native-runtime`
   (ADR 0022); the F2 change is archived at
   `openspec/changes/archive/2026-09-22-f2-2d-layer`.

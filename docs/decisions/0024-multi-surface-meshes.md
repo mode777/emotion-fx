@@ -36,7 +36,7 @@ changing it after either milestone ships would break scripts.
   MeshData; per-primitive material → its surface's binding. Weights stay
   per-primitive attributes (`JOINTS_0`/`WEIGHTS_0`).
 
-Full process record: `openspec/changes/f3-3d-core/`.
+Full process record: `openspec/changes/archive/2026-09-25-f3-3d-core/`.
 
 ## Consequences
 
