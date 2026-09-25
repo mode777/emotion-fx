@@ -249,19 +249,15 @@ void efx_pipeline_install(void) {
             /* mesh surfaces always draw indexed; non-indexed surfaces get
                a synthesized identity index buffer at upload (render.c) */
             .index_type = SG_INDEXTYPE_UINT32,
-            /* Only the attributes the canned F3 shader consumes are
-               declared: the HLSL/Metal compilers strip unused inputs from
-               the shader signature, and a pipeline declaring them fails
-               InputLayout/RPS creation on D3D11/Metal (GL is lenient).
-               The 48-byte interleaved layout is unchanged; F4 re-adds
-               attrs 1/2 when its shaders start reading normals/uvs. */
+            /* all four attribute slots are declared so the layout matches
+               the shader input signature on every backend (D3D11
+               CreateInputLayout rejects partial coverage); normal/uv are
+               bound but unused until F4 reads them */
             .layout = {.buffers[0].stride = (int)sizeof(pipe_mesh_vertex),
                        .attrs = {[ATTR_mesh_a_pos] = {.format = SG_VERTEXFORMAT_FLOAT3, .offset = 0},
                                  [ATTR_mesh_a_normal] = {.format = SG_VERTEXFORMAT_FLOAT3, .offset = 12},
                                  [ATTR_mesh_a_uv] = {.format = SG_VERTEXFORMAT_FLOAT2, .offset = 24},
                                  [ATTR_mesh_a_color] = {.format = SG_VERTEXFORMAT_FLOAT4, .offset = 32}}},
-            /* slots 2 (normal) and 3 (uv) join in F4 when the canned
-               shader starts consuming them */
             .colors[0] = {.blend = blends[i]},
             .depth = {.compare = SG_COMPAREFUNC_LESS_EQUAL,
                       .write_enabled = true},
@@ -308,15 +304,15 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
                          mr->camera.near_z, mr->camera.far_z);
     efx_math_mul(pv, proj, view);
     efx_math_mul(mvp, pv, mr->transform);
-    fprintf(stderr, "DIAG play_mesh: native=%p surfaces=%d\n", m, m ? m->surface_count : -1); fflush(stderr);
     if (P.depth_remap) {
         /* row 2 of the clip matrix: z' = 0.5*z_clip + 0.5*w_clip maps the
            GL-style (-1..1) range onto the D3D11/Metal (0..1) range;
-           monotonic, so depth comparisons and ties are unchanged */
-        mvp[2] *= 0.5f;
-        mvp[6] *= 0.5f;
-        mvp[10] *= 0.5f;
-        mvp[14] = mvp[14] * 0.5f + mvp[15] * 0.5f;
+           monotonic, so depth comparisons and ties are unchanged. Row 3
+           carries the perspective w in every column (not just the
+           translation), so the fold must cover all four columns. */
+        for (int c = 0; c < 4; c++) {
+            mvp[c * 4 + 2] = 0.5f * mvp[c * 4 + 2] + 0.5f * mvp[c * 4 + 3];
+        }
     }
 
     vs_params_t vs;

@@ -97,7 +97,7 @@ static void efx_capture_setup(void) {
     g_cap_img = sg_make_image(&(sg_image_desc){
         .width = EFX_CAP_W,
         .height = EFX_CAP_H,
-        .pixel_format = SG_PIXELFORMAT_RGBA8,
+        .pixel_format = SG_PIXELFORMAT_BGRA8, /* must match the MTL texture and the pipelines' env-default color format */
         .usage.color_attachment = true,
         .mtl_textures[0] = g_cap_mtl,
     });

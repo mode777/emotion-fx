@@ -120,8 +120,14 @@ this document covers its engineering.
   clear is additive; 2D-only scenes render identically (verify F2 golden
   suite unchanged in tasks).
 - [Per-backend depth semantics drift (D3D11/Metal vs GL)] → sokol
-  normalizes depth state; the four-target golden gate (ADR 0020) is the
-  arbiter; depth scenes are part of the committed set.
+  normalizes depth *state* (compare/write) but not the clip-space depth
+  *range*: GL clips z to [-w, w], D3D11/Metal to [0, w]. Playback folds the
+  remap into the MVP on the 0..1 backends (`origin_top_left` backends) as
+  row2 = 0.5·row2 + 0.5·row3 across all four columns — row 3 carries the
+  perspective w in every column, so a translation-only fold clips the near
+  half of every mesh (the Windows/macOS hollow-cube symptom). The
+  four-target golden gate (ADR 0020) is the arbiter; depth scenes are part
+  of the committed set.
 - [GLM vendoring size] → vendor only used headers (`vec3`/`vec4`/`mat4`)
   with a pinned commit hash recorded in `vendor/README.md`.
 - [JS math duplication drifting from engine math] → cross-check unit tests

@@ -67,8 +67,6 @@ int efx_capture_read_rgba(uint8_t **out_pixels, int *out_w, int *out_h) {
     ID3D11Device *dev = (ID3D11Device *)env.d3d11.device;
     ID3D11DeviceContext *ctx = (ID3D11DeviceContext *)env.d3d11.device_context;
     IDXGISwapChain *sc = (IDXGISwapChain *)sapp_d3d11_get_swap_chain();
-    fprintf(stderr, "capture: dev=%p ctx=%p sc=%p\n", (void *)dev, (void *)ctx, (void *)sc);
-    fflush(stderr);
     if (!dev || !ctx || !sc) {
         return -1;
     }
