@@ -395,19 +395,12 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
     }
 
     vs_params_t vs;
-    /* the shader computes clip = vec4(dot(mvp0,p), ...) so each vec4 is a
-       ROW of the clip matrix: rows[r] = {m[r], m[4+r], m[8+r], m[12+r]} */
-    for (int row = 0; row < 4; row++) {
-        float *dst = (row == 0) ? vs.mvp0 : (row == 1) ? vs.mvp1
-                   : (row == 2) ? vs.mvp2 : vs.mvp3;
-        for (int c = 0; c < 4; c++) {
-            dst[c] = mvp[c * 4 + row];
-        }
-    }
-    vs.tint[0] = mr->color[0];
-    vs.tint[1] = mr->color[1];
-    vs.tint[2] = mr->color[2];
-    vs.tint[3] = mr->color[3];
+    memcpy(vs.mvp, mvp, sizeof(mvp));
+    fs_params_t fs;
+    fs.tint[0] = mr->color[0];
+    fs.tint[1] = mr->color[1];
+    fs.tint[2] = mr->color[2];
+    fs.tint[3] = mr->color[3];
 
     sg_apply_pipeline(P.mesh_pip[mr->blend]);
     for (int i = 0; i < m->surface_count; i++) {
@@ -417,20 +410,13 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
         }
         sg_bindings bnd = {0};
         bnd.vertex_buffers[0] = s->vbuf;
-        if (DIAG_NOIB) {
-            /* TEMPORARY: bypass the index buffer entirely */
-            sg_apply_bindings(&bnd);
-            sg_apply_uniforms(UB_vs_params,
-                              &(sg_range){.ptr = &vs, .size = sizeof(vs)});
-            sg_draw(0, s->vertex_count, 1);
-            continue;
-        }
         bnd.index_buffer = s->ibuf;
         sg_apply_bindings(&bnd);
-        /* documented order: pipeline -> bindings -> uniforms -> draw; the
-           single uniform block is per record, applied per surface draw */
+        /* documented order: pipeline -> bindings -> uniforms -> draw */
         sg_apply_uniforms(UB_vs_params,
                           &(sg_range){.ptr = &vs, .size = sizeof(vs)});
+        sg_apply_uniforms(UB_fs_params,
+                          &(sg_range){.ptr = &fs, .size = sizeof(fs)});
         sg_draw(0, s->index_count, 1);
     }
 }
@@ -510,11 +496,10 @@ void efx_pipeline_play(void) {
             }
             sg_update_buffer(dtb, &(sg_range){.ptr = tri, .size = sizeof(tri)});
             vs_params_t vs;
-            memcpy(vs.mvp0, (const float[4]){1, 0, 0, 0}, 16);
-            memcpy(vs.mvp1, (const float[4]){0, 1, 0, 0}, 16);
-            memcpy(vs.mvp2, (const float[4]){0, 0, 1, 0}, 16);
-            memcpy(vs.mvp3, (const float[4]){0, 0, 0, 1}, 16);
-            vs.tint[0] = 1; vs.tint[1] = 1; vs.tint[2] = 1; vs.tint[3] = 1;
+            memcpy(vs.mvp, (const float[16]){1, 0, 0, 0, 0, 1, 0, 0,
+                                             0, 0, 1, 0, 0, 0, 0, 1}, 64);
+            fs_params_t fs;
+            fs.tint[0] = 1; fs.tint[1] = 1; fs.tint[2] = 1; fs.tint[3] = 1;
             sg_apply_pipeline(P.mesh_pip[0]);
             sg_bindings bnd = {0};
             bnd.vertex_buffers[0] = dtb;
@@ -522,17 +507,15 @@ void efx_pipeline_play(void) {
             sg_apply_bindings(&bnd);
             sg_apply_uniforms(UB_vs_params,
                               &(sg_range){.ptr = &vs, .size = sizeof(vs)});
+            sg_apply_uniforms(UB_fs_params,
+                              &(sg_range){.ptr = &fs, .size = sizeof(fs)});
             sg_draw(0, 3, 1);
         } else {
             vs_params_t vs;
-            memcpy(vs.mvp0, (const float[4]){1, 0, 0, 0}, 16);
-            memcpy(vs.mvp1, (const float[4]){0, 1, 0, 0}, 16);
-            memcpy(vs.mvp2, (const float[4]){0, 0, 1, 0}, 16);
-            memcpy(vs.mvp3, (const float[4]){0, 0, 0, 1}, 16);
-            vs.tint[0] = 1;
-            vs.tint[1] = 1;
-            vs.tint[2] = 1;
-            vs.tint[3] = 1;
+            memcpy(vs.mvp, (const float[16]){1, 0, 0, 0, 0, 1, 0, 0,
+                                             0, 0, 1, 0, 0, 0, 0, 1}, 64);
+            fs_params_t fs;
+            fs.tint[0] = 1; fs.tint[1] = 1; fs.tint[2] = 1; fs.tint[3] = 1;
             sg_apply_pipeline(P.mesh_pip[0]);
             sg_bindings bnd = {0};
             bnd.vertex_buffers[0] = tb;
@@ -540,6 +523,8 @@ void efx_pipeline_play(void) {
             sg_apply_bindings(&bnd);
             sg_apply_uniforms(UB_vs_params,
                               &(sg_range){.ptr = &vs, .size = sizeof(vs)});
+            sg_apply_uniforms(UB_fs_params,
+                              &(sg_range){.ptr = &fs, .size = sizeof(fs)});
             sg_draw(0, 3, 1);
         }
         return;

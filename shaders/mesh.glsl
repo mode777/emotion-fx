@@ -10,15 +10,8 @@
  */
 
 @vs mesh_vs
-/* The MVP is a plain vec4[4] (std140, 16 floats column-major) combined
-   with explicit dot products: identical uniform bytes and identical math
-   on every backend, with no per-backend matrix-packing conventions. */
 layout(binding=0) uniform vs_params {
-    vec4 mvp0;
-    vec4 mvp1;
-    vec4 mvp2;
-    vec4 mvp3;
-    vec4 tint;
+    mat4 mvp;
 };
 
 /* Attribute slots must be declared consumed-first: the canned F3 shader
@@ -32,20 +25,22 @@ in vec2 a_uv;
 out vec4 efx_color;
 
 void main() {
-    vec4 p = vec4(a_pos, 1.0);
-    vec4 clip = vec4(dot(mvp0, p), dot(mvp1, p), dot(mvp2, p), dot(mvp3, p));
-    gl_Position = clip;
-    efx_color = a_color * tint;
+    gl_Position = mvp * vec4(a_pos, 1.0);
+    efx_color = a_color;
 }
 @end
 
 @fs mesh_fs
+layout(binding=1) uniform fs_params {
+    vec4 tint;
+};
+
 in vec4 efx_color;
 
 out vec4 frag_color;
 
 void main() {
-    frag_color = efx_color;
+    frag_color = efx_color * tint;
 }
 @end
 
