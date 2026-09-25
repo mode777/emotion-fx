@@ -27,8 +27,12 @@
 #define VECMATH_GENERICS
 #include "vecmath.h"
 #define SOKOL_SHDC_IMPL
+#define vs_params_t cube_vs_params_t
 #include "cube-sapp.h"
+#undef vs_params_t
+#define vs_params_t mesh_vs_params_t
 #include "../../shaders/mesh.h"
+#undef vs_params_t
 #include "../../src/math/efx_math.h"
 
 
@@ -242,8 +246,9 @@ static void frame(void) {
     const float t = (float)(sapp_frame_duration() * 60.0);
     state.rx += 1.0f * t; state.ry += 2.0f * t;
     const int variant = diag_variant();
-    const int use_mesh_shader = (variant == 3 || variant == 4);
-    vs_params_t vs_params;
+    const int use_mesh_shader = (variant >= 3);
+    cube_vs_params_t vs_params;
+    mesh_vs_params_t mesh_vs;
     if (variant == 4) {
         /* engine camera math: efx_math rows from the same view */
         float proj[16], view[16], vp[16], model[16], mvp[16];
@@ -260,14 +265,14 @@ static void frame(void) {
         efx_math_rotate(model, model, state.rx, ay);
         efx_math_mul(mvp, vp, model);
         for (int r = 0; r < 4; r++) {
-            float *dst = (r == 0) ? vs_params.mvp0 : (r == 1) ? vs_params.mvp1
-                       : (r == 2) ? vs_params.mvp2 : vs_params.mvp3;
+            float *dst = (r == 0) ? mesh_vs.mvp0 : (r == 1) ? mesh_vs.mvp1
+                       : (r == 2) ? mesh_vs.mvp2 : mesh_vs.mvp3;
             for (int c = 0; c < 4; c++) {
                 dst[c] = mvp[c * 4 + r];
             }
         }
-        vs_params.tint[0] = 1; vs_params.tint[1] = 1;
-        vs_params.tint[2] = 1; vs_params.tint[3] = 1;
+        mesh_vs.tint[0] = 1; mesh_vs.tint[1] = 1;
+        mesh_vs.tint[2] = 1; mesh_vs.tint[3] = 1;
     } else {
         vs_params = compute_vsparams(state.rx, state.ry);
     }
@@ -299,7 +304,11 @@ static void frame(void) {
 #endif
     sg_apply_pipeline(state.pip);
     sg_apply_bindings(&state.bind);
-    sg_apply_uniforms(UB_vs_params, &SG_RANGE(vs_params));
+    if (use_mesh_shader) {
+        sg_apply_uniforms(UB_vs_params, &SG_RANGE(mesh_vs));
+    } else {
+        sg_apply_uniforms(UB_vs_params, &SG_RANGE(vs_params));
+    }
     sg_draw(0, 36, 1);
     sg_end_pass();
     sg_commit();
