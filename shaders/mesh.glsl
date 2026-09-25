@@ -14,9 +14,10 @@ layout(binding=0) uniform vs_params {
     mat4 mvp;
 };
 
-/* Attribute slots must be declared consumed-first: the canned F3 shader
-   reads only position and color, and sokol requires pipeline attribute
-   slots to be contiguous from 0 (F4 re-adds normal/uv as slots 2/3). */
+/* Slot order is consumed-first (pos, color, then normal, uv): every slot is
+   declared and bound by the pipeline so the layout matches the compiled
+   input signature on D3D11/Metal; normal/uv are unread until F4 lights and
+   maps the surface. */
 in vec3 a_pos;
 in vec4 a_color;
 in vec3 a_normal;

@@ -27,7 +27,7 @@ static void mock_destroy(void *ud, void *native) {
 }
 
 static const efx_render_sink g_sink = {
-    NULL, mock_create, mock_destroy, NULL, NULL, NULL, NULL,
+    NULL, mock_create, mock_destroy, NULL, NULL, NULL,
 };
 
 static efx_runtime *g_rt;

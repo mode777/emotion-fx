@@ -30,6 +30,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libx11-dev libxi-dev libxcursor-dev libgl1-mesa-dev xvfb
 
+      - name: Generated prelude header is current
+        if: runner.os == 'Linux'
+        run: python3 tools/gen_prelude.py --check
+
       - name: Configure
         run: cmake -B build -DEFX_BUILD_DEV_HARNESS=ON -DEFX_BUILD_GOLDEN_TESTS=ON -DCMAKE_BUILD_TYPE=Release
 

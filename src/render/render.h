@@ -152,7 +152,6 @@ typedef struct efx_render_sink {
     void *(*create_mesh)(void *ud, const efx_mesh_gpu_surface *surfaces,
                          int count);
     void (*destroy_mesh)(void *ud, void *native);
-    void (*play)(void *ud, const efx_quad_record *records, int count);
     void (*shutdown)(void *ud);
 } efx_render_sink;
 

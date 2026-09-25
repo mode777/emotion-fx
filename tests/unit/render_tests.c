@@ -64,7 +64,7 @@ static void mock_destroy_mesh(void *ud, void *native) {
 static void install_mock_sink(void) {
     static const efx_render_sink sink = {
         NULL, mock_create, mock_destroy, mock_create_mesh, mock_destroy_mesh,
-        NULL, NULL,
+        NULL,
     };
     efx_render_install_sink(&sink);
     g_tex_created = 0;
@@ -223,7 +223,7 @@ static int blend_snapshot(void) {
 static int record_budget(void) {
     static const efx_render_sink sink = {
         NULL, mock_create, mock_destroy, mock_create_mesh, mock_destroy_mesh,
-        NULL, NULL,
+        NULL,
     };
     efx_render_install_sink(&sink);
     int pushed = 0;
@@ -443,13 +443,16 @@ static int mesh_lifecycle(void) {
     if (efx_render_mesh_destroy(m1) == EFX_RENDER_OK)
         return fail("dead mesh handle destroy");
 
-    /* stale handle after slot reuse */
+    /* the released slot is reused (same index, bumped generation) and the
+       stale handle stays dead */
     uint64_t stale = m1;
     md = make_two_surface_mesh();
     uint64_t m2 = efx_render_mesh_create(md);
     efx_meshdata_destroy(md);
     if (!m2 || m2 == stale) return fail("mesh handle reuse");
+    if ((m2 & 0xffffffffu) != (stale & 0xffffffffu)) return fail("mesh slot not reused");
     if (efx_render_mesh_alive(stale)) return fail("stale mesh alive");
+    if (!efx_render_mesh_alive(m2)) return fail("reused slot not alive");
     efx_render_end_frame();
     efx_render_shutdown();
     return 0;
@@ -470,7 +473,7 @@ static int mesh_pending_upload(void) {
     if (g_mesh_created != 0) return fail("created without sink");
     static const efx_render_sink sink = {
         NULL, mock_create, mock_destroy, mock_create_mesh, mock_destroy_mesh,
-        NULL, NULL,
+        NULL,
     };
     efx_render_install_sink(&sink);
     if (g_mesh_created != 1) return fail("pending flush");

@@ -982,10 +982,6 @@ static int read_index_array(JSContext *ctx, JSValueConst v, uint32_t **out,
     return 0;
 }
 
-static void free_float_array(float *p) {
-    free(p);
-}
-
 /* reject unknown fields on an object with a TypeError naming the field */
 static int check_known_fields(JSContext *ctx, JSValueConst obj,
                               const char **known, int nknown,
@@ -1029,9 +1025,30 @@ static int check_known_fields(JSContext *ctx, JSValueConst obj,
 static const char *MD_KEYS[] = {"positions", "normals", "uvs",
                                 "colors", "indices"};
 
-/* extract one surface object into an efx_surface_src (owned buffers) */
+/* buffers extracted from JS for one createMeshData call; every allocation
+ * is registered here the moment it exists so a single release path frees
+ * each exactly once on success and on every error exit */
+typedef struct {
+    float *f[EFX_MESH_MAX_SURFACES * 4];
+    uint32_t *i[EFX_MESH_MAX_SURFACES];
+    int nf, ni;
+} md_owned;
+
+static void md_owned_free(md_owned *o) {
+    for (int k = 0; k < o->nf; k++) {
+        free(o->f[k]);
+    }
+    for (int k = 0; k < o->ni; k++) {
+        free(o->i[k]);
+    }
+    o->nf = 0;
+    o->ni = 0;
+}
+
+/* extract one surface object into an efx_surface_src; buffers are owned
+ * by *own (the caller releases them, on success and on failure alike) */
 static int read_surface(JSContext *ctx, JSValueConst obj, efx_surface_src *s,
-                        float **own_f, uint32_t **own_i, int *n_own_f) {
+                        md_owned *own) {
     memset(s, 0, sizeof(*s));
     if (!JS_IsObject(obj)) {
         type_error(ctx, "surfaces must be objects");
@@ -1041,12 +1058,8 @@ static int read_surface(JSContext *ctx, JSValueConst obj, efx_surface_src *s,
         return -1;
     }
     static const char *keys[] = {"positions", "normals", "uvs", "colors"};
-    float *bufs[4];
-    int lens[4];
-    for (int i = 0; i < 4; i++) {
-        bufs[i] = NULL;
-        lens[i] = 0;
-    }
+    float *bufs[4] = {NULL, NULL, NULL, NULL};
+    int lens[4] = {0, 0, 0, 0};
     for (int i = 0; i < 4; i++) {
         JSValue v = JS_GetPropertyStr(ctx, obj, keys[i]);
         if (JS_IsUndefined(v)) {
@@ -1056,13 +1069,9 @@ static int read_surface(JSContext *ctx, JSValueConst obj, efx_surface_src *s,
         int rc = read_number_array(ctx, v, &bufs[i], &lens[i], keys[i]);
         JS_FreeValue(ctx, v);
         if (rc != 0) {
-            for (int j = 0; j < 4; j++) {
-                free(bufs[j]);
-            }
             return -1;
         }
-        own_f[*n_own_f] = bufs[i];
-        (*n_own_f)++;
+        own->f[own->nf++] = bufs[i];
     }
     s->positions = bufs[0];
     s->positions_len = lens[0];
@@ -1079,20 +1088,14 @@ static int read_surface(JSContext *ctx, JSValueConst obj, efx_surface_src *s,
         int rc = read_index_array(ctx, iv, &ibuf, &ilen);
         JS_FreeValue(ctx, iv);
         if (rc != 0) {
-            for (int j = 0; j < 4; j++) {
-                free(bufs[j]);
-            }
             return -1;
         }
         s->indices = ibuf;
         s->indices_len = ilen;
-        own_i[0] = ibuf;
+        own->i[own->ni++] = ibuf;
     }
     if (!s->positions) {
         type_error(ctx, "surface requires positions");
-        for (int j = 0; j < 4; j++) {
-            free(bufs[j]);
-        }
         return -1;
     }
     return 0;
@@ -1128,10 +1131,8 @@ JSValue efx_js_createMeshData(JSContext *ctx, JSValueConst this_val,
     }
 
     efx_surface_src src[EFX_MESH_MAX_SURFACES];
-    float *own_f[EFX_MESH_MAX_SURFACES * 4];
-    uint32_t *own_i[1];
-    int n_own_f = 0;
-    own_i[0] = NULL;
+    md_owned own;
+    memset(&own, 0, sizeof(own));
     int count = 0;
 
     if (has_surfaces) {
@@ -1151,7 +1152,7 @@ JSValue efx_js_createMeshData(JSContext *ctx, JSValueConst this_val,
         }
         for (int32_t i = 0; i < len; i++) {
             JSValue sv = JS_GetPropertyUint32(ctx, surfaces, (uint32_t)i);
-            int rc = read_surface(ctx, sv, &src[i], own_f, own_i, &n_own_f);
+            int rc = read_surface(ctx, sv, &src[i], &own);
             JS_FreeValue(ctx, sv);
             if (rc != 0) {
                 JS_FreeValue(ctx, surfaces);
@@ -1163,7 +1164,7 @@ JSValue efx_js_createMeshData(JSContext *ctx, JSValueConst this_val,
     } else {
         JS_FreeValue(ctx, surfaces);
         /* the bag itself is the single surface */
-        int rc = read_surface(ctx, opts, &src[0], own_f, own_i, &n_own_f);
+        int rc = read_surface(ctx, opts, &src[0], &own);
         JS_FreeValue(ctx, positions);
         if (rc != 0) {
             goto fail;
@@ -1174,10 +1175,7 @@ JSValue efx_js_createMeshData(JSContext *ctx, JSValueConst this_val,
     {
         int err = 0;
         efx_meshdata *md = efx_meshdata_create(src, count, &err);
-        for (int i = 0; i < n_own_f; i++) {
-            free_float_array(own_f[i]);
-        }
-        free(own_i[0]);
+        md_owned_free(&own);
         if (!md) {
             if (err == EFX_MESHERR_COUNT || err == EFX_MESHERR_LEN ||
                 err == EFX_MESHERR_INDEX) {
@@ -1198,10 +1196,7 @@ JSValue efx_js_createMeshData(JSContext *ctx, JSValueConst this_val,
     }
 
 fail:
-    for (int i = 0; i < n_own_f; i++) {
-        free_float_array(own_f[i]);
-    }
-    free(own_i[0]);
+    md_owned_free(&own);
     return JS_EXCEPTION;
 }
 

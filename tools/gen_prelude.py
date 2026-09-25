@@ -8,6 +8,8 @@ string to entry.js (ADR 0022 — one source, identical semantics).
 
 Regenerate after editing prelude.js and commit both files:
     python3 tools/gen_prelude.py
+Verify the committed header is current (CI runs this):
+    python3 tools/gen_prelude.py --check
 """
 import sys
 from pathlib import Path
@@ -35,5 +37,18 @@ lines.append("static const unsigned EFX_JS_PRELUDE_LEN = %d;" % len(data))
 lines.append("")
 lines.append("#endif")
 
-OUT.write_text("\n".join(lines) + "\n")
+# bytes with explicit LF so the output is identical on every host (text-mode
+# write_text would emit CRLF on Windows and show up as a whole-file diff)
+generated = ("\n".join(lines) + "\n").encode("utf-8")
+
+if "--check" in sys.argv[1:]:
+    current = OUT.read_bytes() if OUT.exists() else b""
+    if current != generated:
+        print(f"{OUT} is stale: run python3 tools/gen_prelude.py and commit",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"{OUT} is current")
+    sys.exit(0)
+
+OUT.write_bytes(generated)
 print(f"wrote {OUT} ({len(data)} bytes of prelude)")

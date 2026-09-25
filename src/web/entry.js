@@ -336,6 +336,16 @@ function __efxEnsureApi() {
         return ptr;
     }
 
+    /* persistent scratch for per-draw uniforms (drawMesh is a hot path):
+       16 floats transform + 4 floats color, allocated once */
+    var drawScratch = 0;
+    function drawScratchPtr() {
+        if (!drawScratch) {
+            drawScratch = bridge['_malloc'](20 * 4);
+        }
+        return drawScratch;
+    }
+
     function liveImageData(v) {
         if (!(v instanceof EfxImageData)) {
             throw new TypeError('expected an ImageData');
@@ -839,19 +849,18 @@ function __efxEnsureApi() {
                 }
             }
             var tPtr = 0, cPtr = 0;
-            if (transform !== null) {
-                tPtr = mallocCopyF32(transform);
-            }
-            if (color !== null) {
-                cPtr = mallocCopyF32(color);
+            if (transform !== null || color !== null) {
+                var base = drawScratchPtr();
+                if (transform !== null) {
+                    tPtr = base;
+                    HEAPF32.set(transform, tPtr >> 2);
+                }
+                if (color !== null) {
+                    cPtr = base + 16 * 4;
+                    HEAPF32.set(color, cPtr >> 2);
+                }
             }
             var rc = bridge['_efx_bridge_draw_mesh'](m.__handle, tPtr, cPtr);
-            if (tPtr) {
-                bridge['_efx_bridge_mem_free'](tPtr);
-            }
-            if (cPtr) {
-                bridge['_efx_bridge_mem_free'](cPtr);
-            }
             if (rc === 1) {
                 throw new RangeError('display list budget exceeded');
             }

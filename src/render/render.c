@@ -505,8 +505,9 @@ void efx_meshdata_destroy(efx_meshdata *md) {
 
 /* ------------------------------------------------------------- meshes */
 
-/* build the interleaved GPU layout (design D1) into a pending block; the
- * block layout is count · [vcount, icount, interleaved..., indices...] */
+/* build the interleaved GPU layout (design D1) into a pending block: one
+ * backing allocation holding every surface's interleaved vertices followed
+ * by its indices; p->surfs points into it */
 static int pending_build(mesh_pending *p, const efx_meshdata *md) {
     if (!md || md->surface_count < 1 ||
         md->surface_count > EFX_MESH_MAX_SURFACES) {
@@ -524,8 +525,7 @@ static int pending_build(mesh_pending *p, const efx_meshdata *md) {
         index_words += s->index_count ? (size_t)s->index_count
                                       : (size_t)s->vertex_count;
     }
-    size_t header = (size_t)md->surface_count * 2;
-    size_t total_words = header + floats + index_words;
+    size_t total_words = floats + index_words;
     p->data = malloc(total_words * sizeof(uint32_t));
     p->surfs = calloc((size_t)md->surface_count, sizeof(efx_mesh_gpu_surface));
     if (!p->data || !p->surfs) {
@@ -538,8 +538,6 @@ static int pending_build(mesh_pending *p, const efx_meshdata *md) {
     uint32_t *w = (uint32_t *)p->data;
     for (int i = 0; i < md->surface_count; i++) {
         const efx_surface *s = &md->surfaces[i];
-        *w++ = (uint32_t)s->vertex_count;
-        *w++ = (uint32_t)s->index_count;
         efx_mesh_gpu_surface *g = &p->surfs[i];
         g->vertex_count = s->vertex_count;
         g->index_count = s->index_count ? s->index_count : s->vertex_count;
@@ -607,41 +605,57 @@ uint64_t efx_render_mesh_create(const efx_meshdata *md) {
         md->surface_count > EFX_MESH_MAX_SURFACES) {
         return 0;
     }
-    if (R.mesh_count >= R.mesh_cap) {
-        int cap = R.mesh_cap ? R.mesh_cap * 2 : 16;
-        mesh_slot *grown = realloc(R.meshes, (size_t)cap * sizeof(mesh_slot));
-        if (!grown) {
-            return 0;
+    /* reuse a released slot (generation bump invalidates stale handles),
+       else grow */
+    mesh_slot *m = NULL;
+    for (int i = 0; i < R.mesh_count; i++) {
+        if (!R.meshes[i].used) {
+            m = &R.meshes[i];
+            break;
         }
-        R.meshes = grown;
-        R.mesh_cap = cap;
     }
-    mesh_slot *m = &R.meshes[R.mesh_count];
-    memset(m, 0, sizeof(*m));
-    m->used = 1;
-    m->alive = 1;
-    m->gen++;
-    m->surface_count = md->surface_count;
+    if (!m) {
+        if (R.mesh_count >= R.mesh_cap) {
+            int cap = R.mesh_cap ? R.mesh_cap * 2 : 16;
+            mesh_slot *grown = realloc(R.meshes, (size_t)cap * sizeof(mesh_slot));
+            if (!grown) {
+                return 0;
+            }
+            R.meshes = grown;
+            R.mesh_cap = cap;
+        }
+        m = &R.meshes[R.mesh_count];
+        memset(m, 0, sizeof(*m));
+    }
+    uint32_t gen = m->gen + 1;
+    mesh_pending pending = {0, NULL, NULL};
+    void *native = NULL;
     if (R.sink && R.sink->create_mesh) {
-        mesh_pending tmp = {0, NULL, NULL};
-        if (pending_build(&tmp, md) != EFX_RENDER_OK) {
+        if (pending_build(&pending, md) != EFX_RENDER_OK) {
             return 0;
         }
-        m->native = R.sink->create_mesh(R.sink->ud, tmp.surfs, tmp.count);
-        pending_free(&tmp);
-        if (!m->native) {
+        native = R.sink->create_mesh(R.sink->ud, pending.surfs, pending.count);
+        pending_free(&pending);
+        if (!native) {
             return 0;
         }
     } else {
         /* queue the upload (top-level main.js code, headless scripts) */
-        if (pending_build(&m->pending, md) != EFX_RENDER_OK) {
-            m->pending.data = NULL;
+        if (pending_build(&pending, md) != EFX_RENDER_OK) {
             return 0;
         }
     }
-    uint32_t idx = (uint32_t)R.mesh_count + 1;
-    R.mesh_count++;
-    return ((uint64_t)m->gen << 32) | (uint64_t)idx;
+    m->used = 1;
+    m->alive = 1;
+    m->gen = gen;
+    m->surface_count = md->surface_count;
+    m->native = native;
+    m->pending = pending;
+    uint32_t idx = (uint32_t)(m - R.meshes) + 1;
+    if ((int)idx > R.mesh_count) {
+        R.mesh_count = (int)idx;
+    }
+    return ((uint64_t)gen << 32) | (uint64_t)idx;
 }
 
 static int mesh_release(uint64_t h, mesh_slot **out) {
@@ -654,7 +668,9 @@ static int mesh_release(uint64_t h, mesh_slot **out) {
     }
     m->alive = 0;
     if (m->pending.data) {
+        /* upload never happened; release the slot right away */
         pending_free(&m->pending);
+        m->used = 0;
         return EFX_RENDER_OK;
     }
     /* deferred native release at frame end (resource lifecycle rules) */

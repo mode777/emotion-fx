@@ -55,10 +55,19 @@ typedef struct {
     sg_pipeline mesh_pip[3];
     sg_sampler smp;
     sg_buffer vbuf;
+    size_t vbuf_size;       /* bytes; grown on demand (dynamic quad batch) */
     pipe_vertex *scratch;
     int scratch_cap;
+    int *run_first, *run_verts; /* per-run first vertex / vertex count */
+    int run_cap;
     int installed;
     int depth_remap; /* D3D11/Metal: fold 0..1 depth range into MVP */
+    /* view-projection cache: consecutive mesh records usually share the
+       camera snapshot, so recompose only when it (or the aspect) changes */
+    int pv_valid;
+    efx_camera3d pv_cam;
+    float pv_aspect;
+    float pv[16];
 } pipe_state;
 
 static pipe_state P;
@@ -274,15 +283,16 @@ void efx_pipeline_install(void) {
 
     P.smp = sg_make_sampler(&(sg_sampler_desc){.min_filter = SG_FILTER_LINEAR,
                                                .mag_filter = SG_FILTER_LINEAR});
+    P.vbuf_size = 256 * 1024;
     P.vbuf = sg_make_buffer(&(sg_buffer_desc){
-        .size = 256 * 1024,
+        .size = P.vbuf_size,
         .usage = {.vertex_buffer = true, .dynamic_update = true},
     });
     P.installed = 1;
 
     static const efx_render_sink sink = {
         NULL, pipe_create_texture, pipe_destroy_texture,
-        pipe_create_mesh, pipe_destroy_mesh, NULL, NULL,
+        pipe_create_mesh, pipe_destroy_mesh, NULL,
     };
     efx_render_install_sink(&sink);
     efx_render_white_texture(); /* engine-owned 1x1 white (design D5) */
@@ -292,18 +302,29 @@ void efx_pipeline_install(void) {
  * recorded camera and draw every surface in surface order (design
  * D3/D4/D7); equal-depth fragments resolve by record order because the
  * playback order is the record order */
+static const float *view_projection(const efx_camera3d *cam, float aspect) {
+    if (P.pv_valid && P.pv_aspect == aspect &&
+        memcmp(&P.pv_cam, cam, sizeof(*cam)) == 0) {
+        return P.pv;
+    }
+    float up[3] = {0, 1, 0};
+    float view[16], proj[16];
+    efx_math_look_at(view, cam->pos, cam->target, up);
+    efx_math_perspective(proj, cam->fov, aspect, cam->near_z, cam->far_z);
+    efx_math_mul(P.pv, proj, view);
+    P.pv_cam = *cam;
+    P.pv_aspect = aspect;
+    P.pv_valid = 1;
+    return P.pv;
+}
+
 static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
     pipe_mesh *m = (pipe_mesh *)efx_render_mesh_native(mr->mesh);
     if (!m) {
         return;
     }
-    float up[3] = {0, 1, 0};
-    float view[16], proj[16], pv[16], mvp[16];
-    efx_math_look_at(view, mr->camera.pos, mr->camera.target, up);
-    efx_math_perspective(proj, mr->camera.fov, aspect,
-                         mr->camera.near_z, mr->camera.far_z);
-    efx_math_mul(pv, proj, view);
-    efx_math_mul(mvp, pv, mr->transform);
+    float mvp[16];
+    efx_math_mul(mvp, view_projection(&mr->camera, aspect), mr->transform);
     if (P.depth_remap) {
         /* row 2 of the clip matrix: z' = 0.5*z_clip + 0.5*w_clip maps the
            GL-style (-1..1) range onto the D3D11/Metal (0..1) range;
@@ -384,14 +405,23 @@ void efx_pipeline_play(void) {
     /* F2 playback: emit ALL quad runs into one dynamic-buffer update
        (multiple updates per frame are unreliable on Metal/D3D11), then
        interleave run draws and mesh records in record order */
-    pipe_vertex *v = P.scratch;
-    int *run_first = malloc((size_t)(run_count > 0 ? run_count : 1) * sizeof(int));
-    int *run_verts = malloc((size_t)(run_count > 0 ? run_count : 1) * sizeof(int));
-    if (!run_first || !run_verts) {
-        free(run_first);
-        free(run_verts);
-        return;
+    if (run_count > P.run_cap) {
+        int cap = P.run_cap ? P.run_cap : 64;
+        while (cap < run_count) {
+            cap *= 2;
+        }
+        int *first = realloc(P.run_first, (size_t)cap * sizeof(int));
+        int *verts = realloc(P.run_verts, (size_t)cap * sizeof(int));
+        if (first) P.run_first = first;
+        if (verts) P.run_verts = verts;
+        if (!first || !verts) {
+            return;
+        }
+        P.run_cap = cap;
     }
+    int *run_first = P.run_first;
+    int *run_verts = P.run_verts;
+    pipe_vertex *v = P.scratch;
     for (int ri = 0; ri < run_count; ri++) {
         run_first[ri] = (int)(v - P.scratch);
         int start = (int)(v - P.scratch);
@@ -406,8 +436,22 @@ void efx_pipeline_play(void) {
     }
     int vcount = (int)(v - P.scratch);
     if (vcount > 0) {
-        sg_update_buffer(P.vbuf, &(sg_range){.ptr = P.scratch,
-                                             .size = (size_t)vcount * sizeof(pipe_vertex)});
+        size_t bytes = (size_t)vcount * sizeof(pipe_vertex);
+        if (bytes > P.vbuf_size) {
+            /* sokol buffers are fixed-size: replace with a larger one
+               (updated once per frame, so a fresh buffer is safe here) */
+            size_t size = P.vbuf_size;
+            while (size < bytes) {
+                size *= 2;
+            }
+            sg_destroy_buffer(P.vbuf);
+            P.vbuf = sg_make_buffer(&(sg_buffer_desc){
+                .size = size,
+                .usage = {.vertex_buffer = true, .dynamic_update = true},
+            });
+            P.vbuf_size = size;
+        }
+        sg_update_buffer(P.vbuf, &(sg_range){.ptr = P.scratch, .size = bytes});
     }
 
     int run_i = 0;
@@ -431,8 +475,6 @@ void efx_pipeline_play(void) {
             play_mesh_record(&records[i].u.mesh, aspect);
         }
     }
-    free(run_first);
-    free(run_verts);
 }
 
 void efx_pipeline_shutdown(void) {
@@ -448,7 +490,7 @@ void efx_pipeline_shutdown(void) {
     sg_destroy_shader(P.quad_shd);
     sg_destroy_shader(P.mesh_shd);
     free(P.scratch);
-    P.scratch = NULL;
-    P.scratch_cap = 0;
-    P.installed = 0;
+    free(P.run_first);
+    free(P.run_verts);
+    memset(&P, 0, sizeof(P));
 }
