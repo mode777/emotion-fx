@@ -28,6 +28,8 @@
 #include "vecmath.h"
 #define SOKOL_SHDC_IMPL
 #include "cube-sapp.h"
+#include "mesh.h"
+#include "../../src/math/efx_math.h"
 
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -43,6 +45,15 @@ static void diag_slog(const char *tag, uint32_t level, uint32_t item,
     fprintf(stderr, "cube_diag[%s] %s:%u: %s\n", tag,
             filename ? filename : "?", line_nr,
             message ? message : "<no message>");
+}
+
+static int diag_variant(void) {
+    const char *v = getenv("CUBE_DIAG_VARIANT");
+    return (v && *v) ? (*v - '0') : 0;
+}
+static int diag_use_u32(void) {
+    int v = diag_variant();
+    return (v == 1 || v == 3 || v == 4);
 }
 
 static struct {
@@ -170,6 +181,14 @@ static void init(void) {
         .label = "cube-vertices"
     });
 
+    uint32_t indices32[] = {
+        0, 1, 2,  0, 2, 3,
+        6, 5, 4,  7, 6, 4,
+        8, 9, 10,  8, 10, 11,
+        14, 13, 12,  15, 14, 12,
+        16, 17, 18,  16, 18, 19,
+        22, 21, 20,  23, 22, 20
+    };
     uint16_t indices[] = {
         0, 1, 2,  0, 2, 3,
         6, 5, 4,  7, 6, 4,
@@ -180,11 +199,18 @@ static void init(void) {
     };
     sg_buffer ibuf = sg_make_buffer(&(sg_buffer_desc){
         .usage.index_buffer = true,
-        .data = SG_RANGE(indices),
+        .data = {
+            .ptr = diag_use_u32() ? (const void *)indices32
+                                  : (const void *)indices,
+            .size = 36 * (diag_use_u32() ? 4 : 2),
+        },
         .label = "cube-indices"
     });
 
-    sg_shader shd = sg_make_shader(cube_shader_desc(sg_query_backend()));
+    const int use_mesh_shader = (diag_variant() == 3);
+    sg_shader shd = sg_make_shader(use_mesh_shader
+        ? mesh_shader_desc(sg_query_backend())
+        : cube_shader_desc(sg_query_backend()));
 
     state.pip = sg_make_pipeline(&(sg_pipeline_desc){
         .layout = {
@@ -195,7 +221,8 @@ static void init(void) {
             }
         },
         .shader = shd,
-        .index_type = SG_INDEXTYPE_UINT16,
+        .index_type = diag_use_u32() ? SG_INDEXTYPE_UINT32
+                                     : SG_INDEXTYPE_UINT16,
         .cull_mode = SG_CULLMODE_BACK,
         .depth = {
             .write_enabled = true,
@@ -214,7 +241,36 @@ static void init(void) {
 static void frame(void) {
     const float t = (float)(sapp_frame_duration() * 60.0);
     state.rx += 1.0f * t; state.ry += 2.0f * t;
-    const vs_params_t vs_params = compute_vsparams(state.rx, state.ry);
+    const int variant = diag_variant();
+    const int use_mesh_shader = (variant == 3 || variant == 4);
+    vs_params_t vs_params;
+    if (variant == 4) {
+        /* engine camera math: efx_math rows from the same view */
+        float proj[16], view[16], vp[16], model[16], mvp[16];
+        float eye[3] = {0.0f, 1.5f, 4.0f};
+        float center[3] = {0.0f, 0.0f, 0.0f};
+        float up[3] = {0.0f, 1.0f, 0.0f};
+        float ax[3] = {0, 1, 0};
+        float ay[3] = {1, 0, 0};
+        efx_math_perspective(proj, 60.0f, 640.0f / 480.0f, 0.01f, 10.0f);
+        efx_math_look_at(view, eye, center, up);
+        efx_math_mul(vp, proj, view);
+        efx_math_identity(model);
+        efx_math_rotate(model, model, state.ry, ax);
+        efx_math_rotate(model, model, state.rx, ay);
+        efx_math_mul(mvp, vp, model);
+        for (int r = 0; r < 4; r++) {
+            float *dst = (r == 0) ? vs_params.mvp0 : (r == 1) ? vs_params.mvp1
+                       : (r == 2) ? vs_params.mvp2 : vs_params.mvp3;
+            for (int c = 0; c < 4; c++) {
+                dst[c] = mvp[c * 4 + r];
+            }
+        }
+        vs_params.tint[0] = 1; vs_params.tint[1] = 1;
+        vs_params.tint[2] = 1; vs_params.tint[3] = 1;
+    } else {
+        vs_params = compute_vsparams(state.rx, state.ry);
+    }
 
 #if defined(SOKOL_METAL)
     sg_begin_pass(&(sg_pass){
@@ -366,7 +422,7 @@ int main(int argc, char *argv[]) {
         .cleanup_cb = cleanup,
         .width = 640,
         .height = 480,
-        .sample_count = 4,
+        .sample_count = (diag_variant() >= 2) ? 1 : 4,
         .window_title = "cube_diag (official cube-sapp adaptation)",
         .logger.func = diag_slog,
     });
