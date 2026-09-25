@@ -38,21 +38,35 @@ context: |
 rules:
   proposal:
     - Name the milestone (F1–F8) this change implements
-    - Name the affected docs (js-api.md, decisions) and state explicitly whether an ADR is needed ("No ADR — reason" vs "new ADR docs/decisions/NNNN")
+    - Name the affected docs (js-api.md, decisions) and state explicitly whether
+      an ADR is needed ("No ADR — reason" vs "new ADR docs/decisions/NNNN")
     - State explicitly what is out of scope (Non-goals)
   tasks:
-    - When the change settles a durable architecture decision, include an explicit task to write the ADR (docs/decisions/NNNN per TEMPLATE.md) and add it to the docs/decisions/README.md index
-    - Include a docs update task whenever invariants, the script-facing API (docs/js-api.md), or the roadmap/current-state sections of AGENTS.md change
-    - Include a verification task naming the harness (ctest smoke suite; golden-image harness once F2 lands it) per the milestone's verification gate
+    - When the change settles a durable architecture decision, include an
+      explicit task to write the ADR (docs/decisions/NNNN per TEMPLATE.md) and
+      add it to the docs/decisions/README.md index
+    - Include a docs update task whenever invariants, the script-facing API
+      (docs/js-api.md), or the roadmap/current-state sections of AGENTS.md
+      change
+    - Include a verification task naming the harness (ctest smoke suite;
+      golden-image harness once F2 lands it) per the milestone's verification
+      gate
   design:
     - Record rejected alternatives with the reason they lost
-    - State how unmanaged resources are exposed to scripts: dynamic-count resources as GC-finalized opaque classes with explicit destroy() (ADR 0011, memory discipline ADR 0012); fixed banks (lights) as pre-allocated slots
+    - State how unmanaged resources are exposed to scripts: dynamic-count resources as
+        GC-finalized opaque classes with explicit destroy() (ADR 0011, memory
+        discipline ADR 0012); fixed banks (lights) as pre-allocated slots
 
 # Per-operation guidance (optional)
 operations:
   apply:
     guidance:
-      - If a durable decision is settled during apply that the proposal did not anticipate, record it in the design doc and note whether an ADR must follow before archive
+      - If a durable decision is settled during apply that the proposal did not
+        anticipate, record it in the design doc and note whether an ADR must
+        follow before archive
   archive:
     guidance:
-      - Before archiving, confirm any ADR the change promised is written in docs/decisions/ and indexed in docs/decisions/README.md
+      - Before archiving, confirm any ADR the change promised is written in
+        docs/decisions/ and indexed in docs/decisions/README.md
+githubCopilot:
+  cloudAgent: false
