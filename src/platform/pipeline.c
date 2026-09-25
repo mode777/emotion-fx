@@ -309,7 +309,8 @@ static void play_mesh_record(const efx_mesh_record *mr, float aspect) {
            GL-style (-1..1) range onto the D3D11/Metal (0..1) range;
            monotonic, so depth comparisons and ties are unchanged. Row 3
            carries the perspective w in every column (not just the
-           translation), so the fold must cover all four columns. */
+           translation), so the fold must cover all four columns
+           (ADR 0025). */
         for (int c = 0; c < 4; c++) {
             mvp[c * 4 + 2] = 0.5f * mvp[c * 4 + 2] + 0.5f * mvp[c * 4 + 3];
         }

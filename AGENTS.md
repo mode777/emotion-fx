@@ -153,6 +153,12 @@ settled — see `docs/decisions/`.
 - Fixed limits: 4 point lights + 1 directional light, 1 camera.
 - Immediate-mode *API*, but rendering goes through a re-orderable display list
   — do not map API calls 1:1 to draw calls.
+- **Sokol does not normalize the clip depth range or attachment formats**
+  (ADR 0025). Camera math is GL-convention; `src/platform/pipeline.c`
+  folds `row2 = 0.5·row2 + 0.5·row3` into the MVP on `origin_top_left`
+  backends (D3D11/Metal) — all four columns, never in shaders. Engine-
+  created attachments must declare the env-default pixel formats. "Only
+  GL renders correctly" plus half-missing meshes means check this first.
 - JS API layering: low/mid-level in C/C++ (`drawQuad`, `drawMesh`,
   `setMaterial`…), high-level conveniences in pure JS (`drawModel`,
   `drawText`…).

@@ -127,7 +127,7 @@ this document covers its engineering.
   perspective w in every column, so a translation-only fold clips the near
   half of every mesh (the Windows/macOS hollow-cube symptom). The
   four-target golden gate (ADR 0020) is the arbiter; depth scenes are part
-  of the committed set.
+  of the committed set. Durable rule: ADR 0025.
 - [GLM vendoring size] → vendor only used headers (`vec3`/`vec4`/`mat4`)
   with a pinned commit hash recorded in `vendor/README.md`.
 - [JS math duplication drifting from engine math] → cross-check unit tests
