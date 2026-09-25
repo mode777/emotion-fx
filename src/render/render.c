@@ -514,7 +514,7 @@ static int pending_build(mesh_pending *p, const efx_meshdata *md) {
     }
     size_t floats = 0;
     for (int i = 0; i < md->surface_count; i++) {
-        floats += (size_t)md->surfaces[i].vertex_count * 7;
+        floats += (size_t)md->surfaces[i].vertex_count * 12;
     }
     /* non-indexed surfaces draw through a synthesized identity index
        buffer (the pipeline is always-indexed; see pipeline.c) */
@@ -544,25 +544,41 @@ static int pending_build(mesh_pending *p, const efx_meshdata *md) {
         g->vertex_count = s->vertex_count;
         g->index_count = s->index_count ? s->index_count : s->vertex_count;
         g->interleaved = (const float *)w;
-        /* GPU packing: pos(3f) + color(4f); color defaults white */
+        /* defaults: normal +z, uv 0, color white (design D1) */
         for (int v = 0; v < s->vertex_count; v++) {
-            float *dst = (float *)w + v * 7;
+            float *dst = (float *)w + v * 12;
             dst[0] = s->positions[v * 3];
             dst[1] = s->positions[v * 3 + 1];
             dst[2] = s->positions[v * 3 + 2];
-            if (s->colors) {
-                dst[3] = s->colors[v * 4];
-                dst[4] = s->colors[v * 4 + 1];
-                dst[5] = s->colors[v * 4 + 2];
-                dst[6] = s->colors[v * 4 + 3];
+            if (s->normals) {
+                dst[3] = s->normals[v * 3];
+                dst[4] = s->normals[v * 3 + 1];
+                dst[5] = s->normals[v * 3 + 2];
             } else {
-                dst[3] = 1.0f;
-                dst[4] = 1.0f;
+                dst[3] = 0.0f;
+                dst[4] = 0.0f;
                 dst[5] = 1.0f;
-                dst[6] = 1.0f;
+            }
+            if (s->uvs) {
+                dst[6] = s->uvs[v * 2];
+                dst[7] = s->uvs[v * 2 + 1];
+            } else {
+                dst[6] = 0.0f;
+                dst[7] = 0.0f;
+            }
+            if (s->colors) {
+                dst[8] = s->colors[v * 4];
+                dst[9] = s->colors[v * 4 + 1];
+                dst[10] = s->colors[v * 4 + 2];
+                dst[11] = s->colors[v * 4 + 3];
+            } else {
+                dst[8] = 1.0f;
+                dst[9] = 1.0f;
+                dst[10] = 1.0f;
+                dst[11] = 1.0f;
             }
         }
-        w += (size_t)s->vertex_count * 7;
+        w += (size_t)s->vertex_count * 12;
         if (s->indices) {
             g->indices = (const uint32_t *)w;
             memcpy(w, s->indices, (size_t)s->index_count * sizeof(uint32_t));
