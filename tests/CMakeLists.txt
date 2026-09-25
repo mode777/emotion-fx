@@ -150,7 +150,7 @@ if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN AND NOT EFX_HEADLESS)
         target_link_libraries(cube_diag PRIVATE
             "-framework Cocoa" "-framework QuartzCore" "-framework Metal")
     elseif(WIN32)
-        target_link_libraries(cube_diag PRIVATE d3d11 dxgi user32 gdi32 shell32)
+        target_link_libraries(cube_diag PRIVATE d3d11 dxgi uuid user32 gdi32 shell32)
     elseif(UNIX)
         target_include_directories(cube_diag PRIVATE
             ${EFX_X11_INCLUDE_DIR} ${EFX_GL_INCLUDE_DIR})

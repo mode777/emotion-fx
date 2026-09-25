@@ -19,9 +19,16 @@
 #include "sokol_gfx.h"
 #include "sokol_app.h"
 #include "sokol_glue.h"
+#define SOKOL_SHDC_IMPL
+#include "cube-sapp.h"
 #define VECMATH_GENERICS
 #include "vecmath.h"
-#include "cube-sapp.h"
+
+#if defined(_WIN32)
+#include <initguid.h>
+#include <d3d11.h>
+#include <dxgi.h>
+#endif
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -182,8 +189,9 @@ static void frame(void) {
 
 #if defined(_WIN32)
     /* D3D11: staging copy of the swapchain back buffer */
-    ID3D11Device *dev = (ID3D11Device *)sapp_d3d11_get_device();
-    ID3D11DeviceContext *ctx = (ID3D11DeviceContext *)sapp_d3d11_get_device_context();
+    sapp_environment env = sapp_get_environment();
+    ID3D11Device *dev = (ID3D11Device *)env.d3d11.device;
+    ID3D11DeviceContext *ctx = (ID3D11DeviceContext *)env.d3d11.device_context;
     IDXGISwapChain *sc = (IDXGISwapChain *)sapp_d3d11_get_swap_chain();
     ID3D11Texture2D *back = NULL;
     if (FAILED(sc->lpVtbl->GetBuffer(sc, 0, &IID_ID3D11Texture2D, (void **)&back))) {
