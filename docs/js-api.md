@@ -144,7 +144,7 @@ per-surface materials: ADR 0024 — all under `docs/decisions/`).
 | Mesh | GPU mesh (all surfaces uploaded); skinned meshes carry skin, skeleton, and clips internally (ADR 0017); per-surface material binding slot (inert until F4) | Native class | GPU | F3 | `createMesh(meshData)` / `loadMesh`; `mesh.destroy()`; read-only `surfaceCount` |
 | Texture | GPU texture | Native class | GPU | F2 | `createTexture(imageData)`; `tex.destroy()`; read-only `tex.width` / `tex.height` (texture pixels; throw `TypeError` when destroyed); `efx.whiteTexture` is an engine-owned instance (destroy throws) |
 | RenderTarget | GPU render target | Native class | GPU | F5 | `createRenderTarget`; `rt.destroy()` |
-| Materials (Phong parameter objects) | — | JS-managed | — | F4 | Passed to `efx.setMaterial` |
+| Materials (Phong parameter objects) | — | JS-managed | — | F4 | Bound per surface via `efx.setMeshSurfaceMaterial` (ADR 0024) |
 | Fonts (atlas + quad layout) | — | JS-managed | — | F8 | Pure JS over Texture; passed to `drawText` |
 | Lights | — | Slot-based | — | F4 | 4 point slots + 1 directional (fixed) |
 
@@ -674,7 +674,7 @@ section (or an open question below):
 | Matrix math | F3 (`efx.mat4` / `efx.vec3` / `efx.quat`) |
 | Procedural primitives | F3 (`makeCube` / `makePlane` / `makeSphere`) |
 | 4 point lights, 1 directional light | F4, limits table |
-| Phong material system, 4 channels + maps | F4a/F4b (`setMaterial`) |
+| Phong material system, 4 channels + maps | F4a/F4b (`setMeshSurfaceMaterial`) |
 | Alpha masks | F4b (`alphaMask`) |
 | Rendering to textures | F5 (render targets) |
 | Simple post processing (color filter, blur) | F5 (`setColorFilter` / `setBlur`) |

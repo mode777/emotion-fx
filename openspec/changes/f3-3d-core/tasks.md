@@ -51,9 +51,9 @@ requirements live in the delta specs (`specs/3d-core/`, `specs/js-api/`).
 
 ## 9. Docs and ADR
 
-- [ ] 9.1 Write ADR `docs/decisions/0024-multi-surface-meshes.md` per TEMPLATE.md (surface data model, per-surface material bindings, no global material state, efx-verb naming with the method-form alternative, ADR 0014 mapping supersession note) and add it to the `docs/decisions/README.md` index; verify the file exists and is indexed
-- [ ] 9.2 Rewrite the `docs/js-api.md` F3 section to the settled contract (multi-surface `createMeshData`, `createMesh`, `drawMesh`, `setCamera3D`, primitives, math layer, limits table row, MeshData/Mesh query properties) and apply the provisional-section ripples: F4 `setMaterial` → `setMeshSurfaceMaterial` (samples updated), F6 primitives→surfaces wording, F7 per-surface joints/weights, F8 `drawModel` redefined; move F3 entries from provisional to current; verify every F3 entry's signature matches the implementation (spot-check each)
-- [ ] 9.3 Update AGENTS.md (current-state section and roadmap status table for F3 once verified); verify the table matches reality at the time of the update
+- [x] 9.1 Write ADR `docs/decisions/0024-multi-surface-meshes.md` per TEMPLATE.md (surface data model, per-surface material bindings, no global material state, efx-verb naming with the method-form alternative, ADR 0014 mapping supersession note) and add it to the `docs/decisions/README.md` index; verify the file exists and is indexed (also ADR 0025 for the clip-depth remap settled during the gate)
+- [x] 9.2 Rewrite the `docs/js-api.md` F3 section to the settled contract (multi-surface `createMeshData`, `createMesh`, `drawMesh`, `setCamera3D`, primitives, math layer, limits table row, MeshData/Mesh query properties) and apply the provisional-section ripples: F4 `setMaterial` → `setMeshSurfaceMaterial` (samples updated), F6 primitives→surfaces wording, F7 per-surface joints/weights, F8 `drawModel` redefined; move F3 entries from provisional to current; verify every F3 entry's signature matches the implementation (spot-check each)
+- [x] 9.3 Update AGENTS.md (current-state section and roadmap status table for F3 once verified); verify the table matches reality at the time of the update
 
 ## 10. F3 gate (verification order per AGENTS.md)
 

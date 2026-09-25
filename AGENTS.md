@@ -8,10 +8,10 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
 ## Current state
 
 - F1 (player skeleton), F2 (2D layer), and F3 (3D core) are **done** — F3's
-  gate is verified green through the pre-CI server suites (native llvmpipe
-  goldens incl. the six new F3 scenes, Emscripten build + web goldens,
-  emscripten ctest 40/40, desktop↔web compare all-match); the four-target
-  gate run is dispatched on that state. F3 delivers multi-surface meshes
+  four-target gate is green (ci run 36122872839: native suites incl. all
+  twelve goldens on Linux/Windows/macOS, Emscripten ctest + web goldens)
+  after the D3D11/Metal clip-depth fix recorded in ADR 0025. F3 delivers
+  multi-surface meshes
   (Godot-style, ADR 0024), `setCamera3D`, depth-tested `drawMesh`, the GLM
   wrapper (`src/math`, ADR 0005), the shared pure-JS prelude (mat4/vec3/
   quat + makeCube/makePlane/makeSphere), and per-surface material bindings
@@ -32,7 +32,9 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   ADR 0005 — the only C++ TUs) and `src/prelude/` (the engine-bundled
   pure-JS layer — mat4/vec3/quat, procedural primitives — embedded from
   one source via `tools/gen_prelude.py` and evaluated by both the desktop
-  runtime and the web bridge). Local headless iteration:
+  runtime and the web bridge; `src/prelude/prelude.h` is committed and
+  the Linux gate job fails on drift via `gen_prelude.py --check`, so
+  regenerate after every `prelude.js` edit). Local headless iteration:
   `cmake -B build -DEFX_HEADLESS=ON` builds the unit-test targets only
   (no X11 needed); display-required builds run on the verification
   server.
@@ -50,8 +52,10 @@ OpenSpec SDD flow — the `opsx-*` / `openspec-*` commands and skills
   everywhere (on Emscripten the smoke suite runs the same portable scripts
   through the native bridge with the host JS engine as the runtime, plus
   `tools/run_web_compare.mjs` diffs desktop vs web output); golden-image
-  tests (12 committed scenes under `tests/goldens/` — six 2D + six 3D) run
-  where a display exists — Linux CI under `xvfb-run` + llvmpipe,
+  tests (13 committed scenes under `tests/goldens/` — seven 2D + six 3D;
+  `examples/browser/main.js`, the Pages gallery, cycles the same thirteen
+  through the public API and should gain a scene whenever a golden does)
+  run where a display exists — Linux CI under `xvfb-run` + llvmpipe,
   Emscripten in pinned headless Chrome (ADR 0020). Local builds without a display configure with
   `-DEFX_BUILD_GOLDEN_TESTS=OFF` (the default); if a local build dir was
   configured with `ON`, exclude them (`ctest -E golden`) — goldens fail
@@ -132,7 +136,7 @@ implements.
 |---|-----------|------------------|-------------------|--------|
 | F1 | Player skeleton | CMake + vendored Sokol/QuickJS, window, resource root, `main.js` hooks, `--script` run mode | Builds on Win/Linux/macOS/Emscripten; script smoke test crosses the JS/C boundary and exits 0 on each | done |
 | F2 | 2D layer | `drawQuad`, ortho camera, texture slots, blending modes, display list (record → playback); golden-image harness is a first-class deliverable | Golden-image pixel-diff within tolerance + display-list unit tests, all four targets | done — full four-target CI matrix green; `f2a` (shdc) + `f2b` (web runtime) archived, ADR 0021/0022 |
-| F3 | 3D core | Camera, multi-surface mesh resources (ADR 0024), `drawMesh` with depth test, GLM math wrapper, vertex colors, procedural primitives, pure-JS math layer | Golden images + math unit tests | done — server suites green; gate dispatched |
+| F3 | 3D core | Camera, multi-surface mesh resources (ADR 0024), `drawMesh` with depth test, GLM math wrapper, vertex colors, procedural primitives, pure-JS math layer | Golden images + math unit tests | done — four-target gate green (run 36122872839); ADR 0024/0025 |
 | F4 | Lighting + Phong (F4a/F4b) | 4 point + 1 directional light, 4-channel Phong on solids/vertex colors (F4a); per-channel maps + alpha masks (F4b); F4 lighting shaders reuse the sokol-shdc pipeline (strategy settled in F2, ADR 0021) | Golden images + lighting unit tests against a CPU reference implementation | planned |
 | F5 | Render targets + post FX | RTT, fullscreen-quad passes, color filter, blur | Golden images | planned |
 | F6 | Resource packaging | Zip resource root, glTF 2.0 asset import — meshes, images, skins, animation clips (profile decided here), interactive REPL | Script tests load assets from a zip; REPL exercised via piped stdin | planned |
