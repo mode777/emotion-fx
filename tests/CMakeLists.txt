@@ -132,6 +132,33 @@ endif()
 # golden-image tests (require a GPU/display; enable in CI or locally with a
 # running window system) — Emscripten goldens run through the browser job
 option(EFX_BUILD_GOLDEN_TESTS "Build/run golden-image capture tests" OFF)
+
+# TEMPORARY cross-platform rendering probe (f3-3d-core debugging): the
+# official cube-sapp sample adapted to this repo's pinned sokol/shdc
+if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN AND NOT EFX_HEADLESS)
+    add_executable(cube_diag diag/cube_diag.c)
+    target_include_directories(cube_diag PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/diag
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/sokol
+        ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/stb)
+    if(UNIX)
+        target_link_libraries(cube_diag PRIVATE m)
+    endif()
+    if(APPLE)
+        enable_language(OBJC)
+        set_source_files_properties(diag/cube_diag.c PROPERTIES LANGUAGE OBJC)
+        target_link_libraries(cube_diag PRIVATE
+            "-framework Cocoa" "-framework QuartzCore" "-framework Metal")
+    elseif(WIN32)
+        target_link_libraries(cube_diag PRIVATE d3d11 dxgi user32 gdi32 shell32)
+    elseif(UNIX)
+        target_include_directories(cube_diag PRIVATE
+            ${EFX_X11_INCLUDE_DIR} ${EFX_GL_INCLUDE_DIR})
+        target_link_libraries(cube_diag PRIVATE
+            ${EFX_X11_LIBRARY} ${EFX_XI_LIBRARY} ${EFX_XCURSOR_LIBRARY}
+            ${EFX_GL_LIBRARY})
+    endif()
+endif()
 if(EFX_BUILD_GOLDEN_TESTS AND NOT EMSCRIPTEN AND NOT EFX_HEADLESS)
     # embeds stb implementations -> relaxed warnings for this tool
     add_executable(efx_imgdiff imgdiff.c)
